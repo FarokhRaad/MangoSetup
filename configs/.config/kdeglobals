@@ -1,0 +1,12 @@
+[General]
+TerminalApplication=kitty
+
+[Icons]
+Theme=breeze
+
+[KDE]
+widgetStyle=qt6ct-style
+
+[PreviewSettings]
+EnableRemoteFolderThumbnail=false
+MaximumRemoteSize=10485760000

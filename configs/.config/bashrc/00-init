@@ -1,0 +1,22 @@
+# -----------------------------------------------------
+# INIT
+# -----------------------------------------------------
+
+# Enable programmable completion features
+if [[ -n $PS1 && -f /usr/share/bash-completion/bash_completion ]]; then
+    source /usr/share/bash-completion/bash_completion
+fi
+
+# Enable fzf
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+# Enable zoxide
+# eval "$(zoxide init bash)"
+
+
+# -----------------------------------------------------
+# Exports
+# -----------------------------------------------------
+export EDITOR="code"
+export PATH="/usr/lib/ccache/bin/:$PATH"
+export PATH=$PATH:~/.cargo/bin/

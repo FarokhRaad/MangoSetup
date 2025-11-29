@@ -1,0 +1,9 @@
+%YAML 1.3
+---
+- Rule:
+  - Test: thumb_wheel_up
+  - Execute: [pactl, set-sink-volume, '@DEFAULT_SINK@', +1%]
+- Rule:
+  - Test: thumb_wheel_down
+  - Execute: [pactl, set-sink-volume, '@DEFAULT_SINK@', -1%]
+...
