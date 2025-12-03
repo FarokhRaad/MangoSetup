@@ -1,0 +1,42 @@
+{
+  "calculator": {
+    "enabled": true,
+    "noTrigger": false,
+    "trigger": "="
+  },
+  "dankActions": {
+    "enabled": true,
+    "variants": [
+      {
+        "icon": "power_settings_new",
+        "displayText": "",
+        "displayCommand": "",
+        "clickCommand": "dms ipc call powermenu toggle",
+        "middleClickCommand": "",
+        "rightClickCommand": "",
+        "updateInterval": 0,
+        "showIcon": true,
+        "showText": false,
+        "id": "variant_1763283344359",
+        "name": "PowerMenu"
+      }
+    ]
+  },
+  "grimblast": {
+    "enabled": true,
+    "saveLocation": "~/Pictures/Screenshotsgrimngrim"
+  },
+  "commandRunner": {
+    "enabled": true,
+    "noTrigger": true,
+    "trigger": ">",
+    "history": [
+      "nvtop",
+      "pacseek",
+      "kwallet",
+      "dgop",
+      "sudo pacman -Ss gimp",
+      "nvim"
+    ]
+  }
+}

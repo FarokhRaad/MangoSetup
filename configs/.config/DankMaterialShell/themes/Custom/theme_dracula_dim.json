@@ -1,0 +1,22 @@
+{
+  "name": "Dracula Dim",
+  "primary": "#717593",
+  "primaryText": "#1E1F29",
+  "primaryContainer": "#5A5E77",
+  "secondary": "#FF79C6",
+  "surface": "#282A36",
+  "surfaceText": "#F8F8F2",
+  "surfaceVariant": "#44475A",
+  "surfaceVariantText": "#F8F8F2",
+  "surfaceContainer": "#282A36",
+  "surfaceContainerHigh": "#343746",
+  "surfaceContainerHighest": "#424450",
+  "background": "#1F2028",
+  "backgroundText": "#EDEDED",
+  "outline": "#5A5E77",
+  "error": "#FF5555",
+  "warning": "#FFB86C",
+  "info": "#BD93F9",
+  "success": "#50FA7B",
+  "matugen_type": "scheme-fidelity"
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Set MangoWC focus to HDMI-A-1 on session start
+After=basic.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mmsg -d focusmon,HDMI-A-1
+
+[Install]
+WantedBy=default.target

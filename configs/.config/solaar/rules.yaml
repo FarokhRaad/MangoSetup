@@ -7,3 +7,19 @@
   - Test: thumb_wheel_down
   - Execute: [pactl, set-sink-volume, '@DEFAULT_SINK@', -1%]
 ...
+---
+- Rule:
+  - MouseGesture: Mouse Right
+  - Execute: [mmsg, -d, exchange_stack_client, next]
+- Rule:
+  - MouseGesture: Mouse Left
+  - Execute: [mmsg, -d, exchange_stack_client, prev]
+...
+---
+- Rule:
+  - MouseGesture: Mouse Up
+  - Execute: [mmsg, -d, togglemaximizescreen]
+- Rule:
+  - MouseGesture: Mouse Down
+  - Execute: [mmsg, -d, togglefloating]
+...

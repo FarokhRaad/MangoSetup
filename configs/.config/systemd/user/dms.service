@@ -1,0 +1,14 @@
+[Unit]
+Description=Dank Material Shell (DMS)
+After=basic.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dms run --session
+ExecReload=/usr/bin/pkill -USR1 -x dms
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

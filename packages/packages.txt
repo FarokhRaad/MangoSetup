@@ -1,6 +1,7 @@
 accountsservice
 adw-gtk-theme
 archlinux-xdg-menu
+quickshell-git
 ark
 bash-completion
 breeze
@@ -18,6 +19,7 @@ ferdium-bin
 ffmpegthumbs
 figlet
 fuse2
+fzf
 git
 greetd-dms-greeter-git
 gum
@@ -32,7 +34,9 @@ limine-mkinitcpio-hook
 limine-snapper-sync
 man-pages
 mangowc-git
+mate-polkit
 matugen
+mpv-mpris
 neovim
 noto-fonts-cjk
 ntfs-3g
@@ -43,9 +47,9 @@ pacman-contrib
 pacseek
 power-profiles-daemon
 qimgv
+gnome-keyring
 qt5ct-kde
 qt6ct-kde
-quickshell-git
 reflector-simple
 rsync
 snap-pac
@@ -60,9 +64,12 @@ vim
 visual-studio-code-bin
 wget
 wl-clipboard
+wlr-randr
 xdg-desktop-portal
+xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
+xdg-users-dirs
+xwayland-satellite
 yazi
-zen-browser-bin
 zoxide
 zsh

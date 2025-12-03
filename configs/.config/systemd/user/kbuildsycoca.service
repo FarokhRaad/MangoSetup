@@ -1,0 +1,17 @@
+[Unit]
+Description=Rebuild KDE service cache (kbuildsycoca6)
+After=basic.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/test -x /usr/bin/kbuildsycoca6
+Environment=XDG_MENU_PREFIX=arch-
+ExecStart=/usr/bin/kbuildsycoca6 --noincremental
+Restart=on-failure
+RestartSec=10
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

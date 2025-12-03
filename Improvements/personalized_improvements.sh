@@ -155,37 +155,12 @@ setup_pacman_conf() {
   enable_pacman_flag "VerbosePkgLists"
 
   # Parallel downloads (tweak number if you prefer)
-  set_pacman_kv_option "ParallelDownloads" "10"
+  set_pacman_kv_option "ParallelDownloads" "5"
 
   # Optional candy, comment this out if you do not like it
   # enable_pacman_flag "ILoveCandy"
 
   success "pacman.conf options updated."
-}
-
-setup_pacman_cache_hook() {
-  info "Adding pacman hook to clean cache automatically."
-
-  local hook_dir="/etc/pacman.d/hooks"
-  local hook_file="$hook_dir/clean_cache.hook"
-
-  $SUDO mkdir -p "$hook_dir"
-
-  cat << 'EOF' | $SUDO tee "$hook_file" > /dev/null
-[Trigger]
-Operation = Upgrade
-Operation = Install
-Operation = Remove
-Type = Package
-Target = *
-
-[Action]
-Description = Clean pacman cache with paccache
-When = PostTransaction
-Exec = /usr/bin/paccache -r
-EOF
-
-  success "Pacman cache cleaning hook written to $hook_file."
 }
 
 # ===========================
@@ -198,7 +173,6 @@ main() {
   setup_audio_powersave
   setup_logind_lid_behavior
   setup_pacman_conf
-  setup_pacman_cache_hook
 
   success "System setup completed. A reboot is recommended."
 }
