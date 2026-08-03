@@ -35,6 +35,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CATALOG="$REPO_DIR/packages/app-catalog.txt"
+#  Single definition of apps.conf's path, used by both the catalog sanity
+#  gate and the apply-defaults step, so the two can never disagree.
+APPS_CONF="$REPO_DIR/configs/.config/mango/conf/apps.conf"
+APPS_CONF_CHECK="$APPS_CONF"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mangosetup"
 SELECTIONS_FILE="$STATE_DIR/selected-packages.txt"
 
@@ -76,7 +80,7 @@ section() {
 
 clear
 banner "MangoSetup
-mango + Noctalia v5 interactive installer"
+mango + DankMaterialShell interactive installer"
 
 gum style --faint "This wizard runs the numbered scripts in this directory in
 order, with an interactive app picker before package installation.
@@ -112,6 +116,47 @@ mkdir -p "$STATE_DIR"
 : > "$SELECTIONS_FILE"
 
 [[ -f "$CATALOG" ]] || { err "app catalog not found: $CATALOG"; exit 1; }
+
+# -----------------------------------------------------------------------------
+#  Catalog sanity gate.
+#  Two failure modes bit this picker before and BOTH were silent, so they are
+#  now hard-checked up front instead of producing a broken picker:
+#
+#  1. A literal COMMA in any label. `gum choose --selected=<list>` is
+#     comma-delimited, so one comma inside a label fragments the preselect
+#     string into non-matching tokens. Symptom: an already-installed app
+#     renders UNCHECKED with no error anywhere. (Real case: a label reading
+#     "Foo (bar - special-cased, see apps.conf)" split into 2 bogus tokens.)
+#
+#  2. A catalog role with NO matching `env=ROLE,` line in apps.conf. The
+#     "apply chosen defaults" step below can then never write that role's
+#     choice, warning only in passing. Checked here so it fails loudly.
+# -----------------------------------------------------------------------------
+catalog_issues=0
+
+if bad_labels=$(awk -F'|' '!/^#/ && NF>=5 && $5 ~ /,/ {printf "    line %d: %s\n", NR, $5}' "$CATALOG") \
+   && [[ -n "$bad_labels" ]]; then
+  err "app-catalog.txt has commas in these labels, which breaks gum's --selected:"
+  printf '%s\n' "$bad_labels"
+  err "Use ' - ' or '/' instead of a comma."
+  catalog_issues=1
+fi
+
+if [[ -f "$APPS_CONF_CHECK" ]]; then
+  while read -r crole; do
+    [[ -n "$crole" ]] || continue
+    grep -q "^env=${crole}," "$APPS_CONF_CHECK" || {
+      err "catalog role '$crole' has no 'env=${crole},<value>' line in apps.conf"
+      catalog_issues=1
+    }
+  done < <(cut -d'|' -f1 "$CATALOG" | grep -vE '^#|^$' | awk '!seen[$0]++')
+fi
+
+if (( catalog_issues )); then
+  err "fix packages/app-catalog.txt (and/or apps.conf) before running the picker"
+  exit 1
+fi
+ok "app catalog sane: no comma-in-label, every role maps to an apps.conf entry"
 
 #  Categories in a fixed, sensible order; derived from the roles actually
 #  present in the catalog so adding a new role there Just Works here too.
@@ -190,7 +235,6 @@ info "selections written to $SELECTIONS_FILE ($(wc -l < "$SELECTIONS_FILE") pack
 #  Write chosen defaults into apps.conf (only roles the picker touched;
 #  anything skipped keeps apps.conf's existing default untouched).
 # -----------------------------------------------------------------------------
-APPS_CONF="$REPO_DIR/configs/.config/mango/conf/apps.conf"
 if ((${#CATEGORY_DEFAULT[@]})) && [[ -f "$APPS_CONF" ]]; then
   section "Applying chosen defaults to apps.conf"
   for role in "${!CATEGORY_DEFAULT[@]}"; do
@@ -217,7 +261,7 @@ fi
 #  STEP 3: package installation
 # =============================================================================
 section "Step 3 / 7 - Install packages"
-if gum confirm --default "Install mango + Noctalia + your chosen apps now?"; then
+if gum confirm --default "Install mango + DankMaterialShell + your chosen apps now?"; then
   extra_flag=()
   $DRY_RUN && extra_flag+=(--dry-run)
   EXTRA_PKG_FILE="$SELECTIONS_FILE" "$SCRIPT_DIR/10-packages.sh" "${extra_flag[@]}"
@@ -271,5 +315,6 @@ fi
 echo
 banner "Setup pass complete"
 gum style --faint "Next: log into a mango session (from your display manager, or
-run 'mango' from a TTY) and verify things work before considering
-./60-session.sh (switch to Noctalia Greeter) or Plasma removal."
+run 'mango' from a TTY) and verify the DankMaterialShell bar, launcher
+(SUPER+space) and keybinds work before running ./60-session.sh to switch
+the display manager to the DMS greeter."

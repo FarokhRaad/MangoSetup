@@ -1,0 +1,30 @@
+[Unit]
+#  Session target for mango, used to scope systemd user services to a mango
+#  session only.
+#
+#  WHY THIS EXISTS
+#  mango is a wlroots/dwl-derived compositor with no native systemd session
+#  integration (unlike niri, which ships niri.service). Without a target to
+#  bind to, the only way to autostart DankMaterialShell as a user service
+#  would be `systemctl --user enable dms`, which starts it in EVERY user
+#  session, including a TTY login or any other desktop.
+#
+#  Binding dms to this target instead means:
+#    systemctl --user add-wants mango-session.target dms
+#  so DMS starts when mango starts it, and stops when the graphical session
+#  goes away.
+#
+#  Started from mango's own autostart.conf:
+#    exec-once=systemctl --user start mango-session.target
+#  which runs AFTER the two environment-export exec-once lines, so
+#  WAYLAND_DISPLAY and friends are already visible to the user manager.
+#
+#  Source: danklinux.com/docs/dankmaterialshell/installation, section
+#  "Compositor-Specific Systemd Setup -> MangoWC".
+Description=MangoWC Session Target
+Requires=graphical-session.target
+After=graphical-session.target
+BindsTo=graphical-session.target
+
+[Install]
+WantedBy=graphical-session.target

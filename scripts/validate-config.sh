@@ -86,8 +86,8 @@ if os.path.exists(layouts_path):
     layouts = set(re.findall(r'\{"[A-Z]+",\s*\w+,\s*"([a-z_]+)"', lt))
 
 DIRECTIVES = {"bind","mousebind","axisbind","gesturebind","switchbind",
-              "exec","exec-once","env","source","monitorrule","tagrule",
-              "layerrule","windowrule"}
+              "exec","exec-once","env","source","source-optional",
+              "monitorrule","tagrule","layerrule","windowrule"}
 BIND_KINDS = {"bind","mousebind","axisbind","gesturebind","switchbind"}
 
 errors = []; warnings = []
@@ -107,19 +107,35 @@ for path in files:
         key = key.strip(); val = val.strip()
         loc = f"{rel}:{lineno}"
 
-        # 8. leftover references to a previous shell generation
-        if re.search(r'\bdms\b|dankbar|DankMaterialShell', line, re.I):
-            warnings.append((loc, "leftover DankMaterialShell reference", line))
-        # 8b. Noctalia v4 (Quickshell/QML) syntax; v5 uses `noctalia msg ...`
-        if 'qs -c noctalia' in line or re.search(r'ipc\s+call\s', line):
+        # 8. Leftover references to a PREVIOUS shell generation.
+        #    The current shell is DankMaterialShell (DMS). These rules used to
+        #    be inverted (they flagged `dms` and `ipc call` as stale, which is
+        #    exactly the CURRENT correct syntax) and therefore failed a valid
+        #    config. Now they flag the shells DMS replaced.
+        if re.search(r'\bnoctalia\b', line, re.I):
             warnings.append((loc,
-                "Noctalia v4 IPC syntax ('qs -c noctalia-shell ipc call'); "
-                "v5 uses 'noctalia msg <command>'", line))
-        # 8c. v4 layer namespaces are suffixed per-screen; v5 mostly is not
-        if re.search(r'layer_name:\s*(dms|quickshell)', line):
+                "reference to Noctalia, which is no longer the shell; "
+                "DMS is driven by `dms ipc call <target> <function>`", line))
+        # 8b. Noctalia v4 (Quickshell/QML) invocation style.
+        if re.search(r'\bqs\s+-c\b', line):
+            warnings.append((loc,
+                "`qs -c <config>` is the old Quickshell-shell invocation; "
+                "DMS runs as the dms.service user unit", line))
+        # 8c. Layer namespaces belonging to a shell that is no longer used.
+        #     DMS registers `dms:*` namespaces, so those are CORRECT here.
+        if re.search(r'layer_name:\s*(noctalia|quickshell)', line):
             warnings.append((loc,
                 "layer namespace belongs to a previous shell and matches "
-                "nothing under Noctalia v5", line))
+                "nothing under DankMaterialShell (DMS uses `dms:*`)", line))
+        # 8d. DMS ipc sanity: `dms ipc call` needs BOTH a target and function.
+        #     `dms ipc call spotlight` alone errors at runtime with
+        #     "Too few arguments provided", which is easy to ship unnoticed
+        #     because the bind still parses fine.
+        m = re.search(r'dms\s+ipc\s+call\s+(\S+)(.*)$', line)
+        if m and not m.group(2).strip():
+            warnings.append((loc,
+                f"`dms ipc call {m.group(1)}` has no function argument; "
+                "DMS requires `call <target> <function>`", line))
 
         # 1. unknown scalar keys
         if key not in DIRECTIVES and key not in all_keys:

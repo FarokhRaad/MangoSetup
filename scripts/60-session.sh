@@ -1,37 +1,54 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  60-session.sh - switch the display manager from SDDM to Noctalia Greeter
+#  60-session.sh - switch the display manager to greetd + the DMS greeter
 # =============================================================================
-#  Reversible. Does NOT disable/remove SDDM by default; it only enables
-#  greetd and points systemd's display-manager.service at it. SDDM stays
-#  installed and can be switched back to at any time (see --revert).
+#  Reversible. Does NOT remove the previous display manager; it only enables
+#  greetd and disables the other unit. The old DM stays installed and can be
+#  switched back to at any time with --revert.
 #
-#  Run this AFTER 10-packages.sh (which installs noctalia-greeter) and
-#  BEFORE your first mango login, or any time later to switch greeters.
+#  Run this AFTER 10-packages.sh (which installs greetd-dms-greeter-bin) and
+#  only ONCE mango + DankMaterialShell are confirmed working, since a broken
+#  greeter locks you out of a graphical login.
 #
-#  Facts used below (verified against noctalia-dev/noctalia-greeter README,
-#  2026-07-30):
-#    - greetd's session command must be the FULL PATH from
-#      `which noctalia-greeter-session`, not assumed to be /usr/bin.
-#    - the greeter needs a `user` in greetd's config matching a real,
-#      dedicated system account (conventionally "greeter").
-#    - session names for [session].default come from `noctalia-greeter
-#      sessions`, which reads wayland-sessions/*.desktop files.
-#    - multi-monitor layout is set in /var/lib/noctalia-greeter/greeter.toml,
-#      not in /etc/greetd/config.toml.
+#  Facts verified against the greetd-dms-greeter-bin PKGBUILD, the installed
+#  /usr/bin/dms-greeter wrapper, and the DMS source, not assumed:
+#    - the greeter binary installs to /usr/bin/dms-greeter, and its QML lives
+#      in /usr/share/quickshell/dms-greeter/. greetd's `command` must be the
+#      FULL resolved path from `command -v dms-greeter`, never an assumed
+#      prefix (/usr/bin vs /usr/local/bin differs by install method).
+#    - `--command COMPOSITOR` is MANDATORY. `dms-greeter` with no argument
+#      exits with "Error: --command COMPOSITOR is required", which greetd
+#      surfaces only as a failed session, i.e. no usable login screen. The
+#      wrapper's own --help lists the accepted values: niri, hyprland, sway,
+#      scroll, miracle, mango, labwc. `mango` IS supported (it appears both
+#      in the usage string and as the example `dms-greeter --command mango`),
+#      so this script passes --command mango. The package's post-install
+#      message shows `--command niri` because niri is upstream's default
+#      example; using it here would launch the WRONG compositor.
+#    - the package pre-creates /var/cache/dms-greeter (mode 750) for greeter
+#      state. It must be owned by the account greetd runs the greeter as.
+#      Overridable with --cache-dir if you ever need to relocate it.
+#    - DMS detects an active DMS greeter by checking for the dms-greeter
+#      binary OR the string "dms-greeter" in /etc/greetd/config.toml
+#      (quickshell/Services/GreeterService.qml:20), so the config below
+#      deliberately keeps that literal name in `command`.
+#    - greetd conventionally runs the greeter as a dedicated unprivileged
+#      system account (here: "greeter"), which must be in the video group.
 #
 #  Usage:
-#    ./60-session.sh              switch SDDM -> greetd + Noctalia Greeter
-#    ./60-session.sh --dry-run    show what would happen
-#    ./60-session.sh --revert     switch back to SDDM
+#    ./60-session.sh              switch to greetd + DMS greeter
+#    ./60-session.sh --dry-run    show what would happen, change nothing
+#    ./60-session.sh --revert     switch back to the previous display manager
 # =============================================================================
 set -uo pipefail
 
 MODE="switch"
+REVERT_TO=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run) MODE="dry-run" ;;
     --revert)  MODE="revert" ;;
+    --revert-to=*) MODE="revert"; REVERT_TO="${arg#*=}" ;;
   esac
 done
 
@@ -46,60 +63,141 @@ run() { if [[ "$MODE" == "dry-run" ]]; then printf '%s[DRY]%s %s\n' "$YELLOW" "$
 
 [[ $EUID -eq 0 ]] && { err "do not run as root; it uses sudo where needed"; exit 1; }
 
+# -----------------------------------------------------------------------------
+#  Detect the currently enabled display manager so --revert has a target and
+#  the switch step knows what to disable. display-manager.service is a symlink
+#  to whichever DM unit is enabled.
+# -----------------------------------------------------------------------------
+detect_dm() {
+  readlink -f /etc/systemd/system/display-manager.service 2>/dev/null \
+    | xargs -r basename 2>/dev/null
+}
+
 if [[ "$MODE" == "revert" ]]; then
-  step "Reverting to SDDM"
-  if ! pacman -Qi sddm &>/dev/null; then
-    err "sddm is not installed; cannot revert. Install it first: sudo pacman -S sddm"
+  step "Reverting away from greetd"
+  target="$REVERT_TO"
+  if [[ -z "$target" ]]; then
+    #  Prefer a DM that is actually installed. sddm and gdm are the usual
+    #  suspects; ly/lightdm/greetd-tuigreet also possible.
+    for cand in sddm gdm lightdm ly; do
+      if pacman -Qi "$cand" &>/dev/null; then target="$cand"; break; fi
+    done
+  fi
+  if [[ -z "$target" ]]; then
+    err "no alternative display manager found installed."
+    err "install one first (e.g. sudo pacman -S sddm), or pass --revert-to=<unit>"
+    exit 1
+  fi
+  if ! pacman -Qi "$target" &>/dev/null; then
+    err "$target is not installed; cannot revert to it"
     exit 1
   fi
   run sudo systemctl disable greetd.service 2>/dev/null
-  run sudo systemctl enable sddm.service
-  ok "greetd disabled, sddm enabled. Takes effect on next reboot."
+  run sudo systemctl enable "${target}.service"
+  ok "greetd disabled, ${target} enabled. Takes effect on next reboot."
   exit 0
 fi
 
 step "Preconditions"
-if ! command -v noctalia-greeter-session &>/dev/null; then
-  err "noctalia-greeter-session not found. Run 10-packages.sh first"
-  err "(it installs the 'noctalia-greeter' AUR package)."
+if ! command -v dms-greeter &>/dev/null; then
+  err "dms-greeter not found. Run 10-packages.sh first"
+  err "(it installs the 'greetd-dms-greeter-bin' AUR package)."
   exit 1
 fi
-GREETER_SESSION_PATH="$(command -v noctalia-greeter-session)"
-ok "noctalia-greeter-session found: $GREETER_SESSION_PATH"
+GREETER_PATH="$(command -v dms-greeter)"
+ok "dms-greeter found: $GREETER_PATH"
+
+#  Confirm THIS build actually accepts `mango` rather than trusting the docs.
+#  The wrapper prints its supported compositors in --help; if a future version
+#  drops mango, fail here instead of writing a greetd config that cannot start.
+if dms-greeter --help 2>&1 | grep -qw mango; then
+  ok "dms-greeter supports --command mango"
+else
+  err "this dms-greeter build does not list 'mango' as a supported compositor."
+  err "Supported values it reports:"
+  dms-greeter --help 2>&1 | grep -iE '^\s*--command' | sed 's/^/    /'
+  err "Refusing to write a greetd config that would fail to start."
+  exit 1
+fi
 
 if ! pacman -Qi greetd &>/dev/null; then
-  err "greetd is not installed (should have come in with noctalia-greeter)."
+  err "greetd is not installed (should have come in with greetd-dms-greeter-bin)."
   exit 1
 fi
 ok "greetd installed"
 
+if ! command -v dms &>/dev/null; then
+  warn "the dms shell binary is not installed; the greeter will still work,"
+  warn "but verify the desktop session itself before rebooting."
+fi
+
+CURRENT_DM="$(detect_dm)"
+info "currently enabled display manager: ${CURRENT_DM:-none detected}"
+
 # -----------------------------------------------------------------------------
 #  greetd needs a dedicated system user to run the greeter session as.
+#  It must be able to open the DRM device, hence the video group.
 # -----------------------------------------------------------------------------
 step "greetd system user"
 if id greeter &>/dev/null; then
-  ok "'greeter' user already exists"
+  ok "'greeter' user exists"
 else
   info "creating system user 'greeter' (standard greetd convention)"
   run sudo useradd -M -G video -s /usr/bin/nologin greeter
   ok "'greeter' user created"
 fi
+if id -nG greeter 2>/dev/null | tr ' ' '\n' | grep -qx video; then
+  ok "'greeter' is in the video group"
+else
+  warn "'greeter' is NOT in the video group; the greeter may fail to start"
+  run sudo usermod -aG video greeter
+fi
 
 # -----------------------------------------------------------------------------
-#  Available Wayland sessions (informational; mango needs a .desktop entry
-#  under wayland-sessions for the greeter's session picker to offer it)
+#  Greeter state directory. The package ships /var/cache/dms-greeter at mode
+#  750; it must be owned by the greeter account or the greeter cannot persist
+#  its last-session / user selection.
+# -----------------------------------------------------------------------------
+step "Greeter state directory"
+if [[ -d /var/cache/dms-greeter ]]; then
+  owner="$(stat -c '%U' /var/cache/dms-greeter 2>/dev/null)"
+  if [[ "$owner" == "greeter" ]]; then
+    ok "/var/cache/dms-greeter owned by greeter"
+  else
+    info "/var/cache/dms-greeter owned by '$owner'; reassigning to greeter"
+    run sudo chown -R greeter:greeter /var/cache/dms-greeter
+  fi
+else
+  info "creating /var/cache/dms-greeter"
+  run sudo install -d -o greeter -g greeter -m 750 /var/cache/dms-greeter
+fi
+
+# -----------------------------------------------------------------------------
+#  Session picker entries. The greeter reads wayland-sessions/*.desktop, so
+#  mango must ship (or you must create) an entry there to be selectable.
 # -----------------------------------------------------------------------------
 step "Session picker entries"
-if command -v noctalia-greeter &>/dev/null; then
-  info "sessions currently visible to the greeter:"
-  noctalia-greeter sessions 2>/dev/null | sed 's/^/    /' || warn "could not list sessions (greeter binary present, listing failed)"
-fi
-if [[ ! -f /usr/share/wayland-sessions/mango.desktop ]] \
-   && [[ ! -f /usr/local/share/wayland-sessions/mango.desktop ]]; then
+found_session=false
+for d in /usr/share/wayland-sessions /usr/local/share/wayland-sessions; do
+  if [[ -f "$d/mango.desktop" ]]; then
+    ok "found $d/mango.desktop"
+    found_session=true
+  fi
+done
+if ! $found_session; then
   warn "no mango.desktop found under wayland-sessions/"
-  warn "the mangowm/mangowm-git AUR package should install one; if it is"
-  warn "missing, create /usr/share/wayland-sessions/mango.desktop pointing"
-  warn "Exec= at the mango binary before relying on the session picker."
+  warn "the mangowm package should install one; if missing, create"
+  warn "/usr/share/wayland-sessions/mango.desktop with Exec= pointing at the"
+  warn "mango binary, or the greeter will not offer a mango session."
+fi
+info "sessions the greeter will offer:"
+sessions=$(ls /usr/share/wayland-sessions/*.desktop \
+              /usr/local/share/wayland-sessions/*.desktop 2>/dev/null \
+           | xargs -r -n1 basename)
+if [[ -n "$sessions" ]]; then
+  printf '%s\n' "$sessions" | sed 's/^/    /'
+else
+  info "    (none found)"
 fi
 
 # -----------------------------------------------------------------------------
@@ -109,11 +207,13 @@ step "Configuring greetd"
 GREETD_CONF="/etc/greetd/config.toml"
 BACKUP="${GREETD_CONF}.bak-$(date +%Y%m%d-%H%M%S)"
 
+#  --command mango is REQUIRED (see the header): without it dms-greeter
+#  exits immediately and greetd has no working session.
 NEW_CONF="[terminal]
 vt = 1
 
 [default_session]
-command = \"${GREETER_SESSION_PATH}\"
+command = \"${GREETER_PATH} --command mango\"
 user = \"greeter\"
 "
 
@@ -132,54 +232,70 @@ printf '%s\n' "$NEW_CONF" | sed 's/^/    /'
 if [[ "$MODE" == "dry-run" ]]; then
   info "[DRY] would write the above to $GREETD_CONF"
 else
+  sudo install -d -m 755 /etc/greetd
   echo "$NEW_CONF" | sudo tee "$GREETD_CONF" >/dev/null
   ok "$GREETD_CONF written"
 fi
 
 # -----------------------------------------------------------------------------
-#  Run the shipped system setup helper if the package provides one
+#  Appearance / layout
 # -----------------------------------------------------------------------------
-step "Greeter system setup"
-if command -v setup_greeter_system.sh &>/dev/null; then
-  info "running the package's own setup_greeter_system.sh (prepares state dirs)"
-  run sudo setup_greeter_system.sh
-elif [[ -x /usr/share/noctalia-greeter/scripts/setup_greeter_system.sh ]]; then
-  run sudo /usr/share/noctalia-greeter/scripts/setup_greeter_system.sh
-else
-  info "no packaged setup script found; ensuring state dir exists manually"
-  run sudo install -d -o greeter -g greeter /var/lib/noctalia-greeter
-fi
-
-# -----------------------------------------------------------------------------
-#  Multi-monitor layout (optional, matches configs/.config/mango/conf/monitors.conf)
-# -----------------------------------------------------------------------------
-step "Multi-monitor layout (optional)"
-info "This machine has three outputs: eDP-1, DP-2 (rotated), HDMI-A-1."
-info "The greeter mirrors on all monitors by default, which is fine to start."
-info "To match the mango layout instead, after first boot into the greeter run:"
-info "  noctalia-greeter outputs"
-info "and set [output].layout in /var/lib/noctalia-greeter/greeter.toml, e.g.:"
-info '  output.layout = "eDP-1:0,640; DP-2:2048,0; HDMI-A-1:3248,360"'
-info "(coordinates are LOGICAL pixels; see monitors.conf for the reasoning"
-info "behind these numbers, particularly the eDP-1 1.25 scale factor)."
-info "If you have Noctalia v5 running already, Settings -> Shell -> Security"
-info "-> Noctalia Greeter -> Sync Now copies wallpaper/palette/layout for you."
+step "Greeter appearance (optional)"
+info "The DMS greeter reads its theme from the DMS config, so it matches the"
+info "desktop shell automatically once DMS has been configured."
+info "Configure it from the running shell: dms ipc call settings focusOrToggle"
+info "  -> Greeter tab, or run: dms doctor  (reports greeter status)"
+info "Multi-monitor: the greeter mirrors across outputs by default, which is"
+info "safe to start with. Adjust from the Greeter settings tab if needed."
 
 # -----------------------------------------------------------------------------
 #  Switch the enabled service
 # -----------------------------------------------------------------------------
 step "Switching display manager"
+#  Guard: if greetd is ALREADY the enabled DM, disabling "$CURRENT_DM" would
+#  disable greetd itself and then re-enable it, which is pointless churn and
+#  reads as a bug in the log. Only disable a DM that is actually different.
 if [[ "$MODE" == "dry-run" ]]; then
-  info "[DRY] would run: sudo systemctl disable sddm.service"
+  if [[ -n "$CURRENT_DM" && "$CURRENT_DM" != "greetd.service" ]]; then
+    info "[DRY] would run: sudo systemctl disable $CURRENT_DM"
+  elif [[ "$CURRENT_DM" == "greetd.service" ]]; then
+    info "greetd is already the enabled display manager; nothing to disable"
+  fi
   info "[DRY] would run: sudo systemctl enable greetd.service"
+  info "[DRY] would reload systemd so display-manager.service repoints"
 else
-  sudo systemctl disable sddm.service 2>/dev/null || true
+  if [[ -n "$CURRENT_DM" && "$CURRENT_DM" != "greetd.service" ]]; then
+    sudo systemctl disable "$CURRENT_DM" 2>/dev/null || true
+    info "disabled $CURRENT_DM (package NOT removed)"
+  elif [[ "$CURRENT_DM" == "greetd.service" ]]; then
+    info "greetd was already enabled; only its config changed"
+  fi
   sudo systemctl enable greetd.service
-  ok "greetd enabled, sddm disabled (SDDM stays installed, not removed)"
+  sudo systemctl daemon-reload
+  ok "greetd enabled"
 fi
 
 step "Summary"
 ok "Session switch prepared."
-info "SDDM is NOT removed; revert any time with: $0 --revert"
-warn "Reboot to take effect. Before rebooting, confirm mango + Noctalia"
-warn "already work (log in manually with 'mango' from a TTY once first if unsure)."
+#  Only advertise a revert target that is a DIFFERENT, installed DM. If greetd
+#  was already enabled there is nothing meaningful to revert to.
+revert_hint=""
+for cand in sddm gdm lightdm ly; do
+  if pacman -Qi "$cand" &>/dev/null; then revert_hint="$cand"; break; fi
+done
+if [[ -n "$revert_hint" ]]; then
+  info "Revert any time with: $0 --revert   (would enable $revert_hint)"
+else
+  warn "No alternative display manager is installed, so --revert has no target."
+  warn "If you want a fallback, install one now (e.g. sudo pacman -S sddm)"
+  warn "BEFORE rebooting, or be ready to log in from a TTY."
+fi
+warn "Reboot to take effect. Before rebooting, confirm mango +"
+warn "DankMaterialShell already work: log in with 'mango' from a TTY once,"
+warn "check the bar renders and SUPER+space opens the launcher."
+warn "If the greeter fails to start, switch to a TTY (Ctrl+Alt+F2) and run:"
+if [[ -n "$revert_hint" ]]; then
+  warn "  sudo systemctl disable greetd && sudo systemctl enable $revert_hint"
+else
+  warn "  sudo systemctl disable greetd    (then log in from the TTY)"
+fi

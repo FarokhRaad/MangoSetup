@@ -14,7 +14,11 @@
 #  package : exact pacman/AUR package name to install
 #  binary  : exact command name to check with `command -v` / launch
 #  source  : repo | aur
-#  label   : human-readable name shown in the picker
+#  label   : human-readable name shown in the picker.
+#            Do NOT encode "default" in a label: which app is the active
+#            default is defined solely by the env=ROLE,value line in
+#            configs/.config/mango/conf/apps.conf (changed via
+#            scripts/swap-app.sh), never by this file.
 #
 #  This file is DATA for scripts/setup.sh, not sourced by mango or bash.
 #  Multiple apps per role are expected and supported: the picker is a
@@ -26,14 +30,14 @@
 # =============================================================================
 
 # --- Terminal -----------------------------------------------------------------
-TERMINAL|konsole|konsole|repo|Konsole (KDE - kept from current setup)
+TERMINAL|konsole|konsole|repo|Konsole (KDE)
 TERMINAL|kitty|kitty|repo|kitty (GPU-accelerated)
 TERMINAL|alacritty|alacritty|repo|Alacritty (GPU-accelerated / minimal)
 TERMINAL|foot|foot|repo|foot (lightweight / Wayland-native)
 TERMINAL|wezterm|wezterm|repo|WezTerm (GPU-accelerated / Lua config)
 
 # --- Browser -------------------------------------------------------------------
-BROWSER|microsoft-edge-stable-bin|microsoft-edge-stable|aur|Microsoft Edge (current default)
+BROWSER|microsoft-edge-stable-bin|microsoft-edge-stable|aur|Microsoft Edge
 BROWSER|firefox|firefox|repo|Firefox
 BROWSER|chromium|chromium|repo|Chromium
 BROWSER|brave-bin|brave|aur|Brave
@@ -42,39 +46,51 @@ BROWSER|zen-browser-bin|zen-browser|aur|Zen Browser
 BROWSER|floorp-bin|floorp|aur|Floorp
 
 # --- File manager ---------------------------------------------------------------
-FILEMANAGER|dolphin|dolphin|repo|Dolphin (KDE - kept from current setup)
+FILEMANAGER|dolphin|dolphin|repo|Dolphin (KDE)
 FILEMANAGER|nautilus|nautilus|repo|Nautilus (GNOME Files)
 FILEMANAGER|nemo|nemo|repo|Nemo (Cinnamon)
 FILEMANAGER|thunar|thunar|repo|Thunar (XFCE)
 FILEMANAGER|pcmanfm-qt|pcmanfm-qt|repo|PCManFM-Qt (LXQt)
 
 # --- Editor (code/text) ----------------------------------------------------------
-EDITOR|code|code|repo|Visual Studio Code (current default)
-GUI_EDITOR|code|code|repo|Visual Studio Code (current default)
+EDITOR|code|code|repo|Visual Studio Code
+GUI_EDITOR|code|code|repo|Visual Studio Code
 EDITOR|neovim|nvim|repo|Neovim
 EDITOR|helix|hx|repo|Helix
 GUI_EDITOR|zed|zed|repo|Zed
 GUI_EDITOR|sublime-text-4|subl|aur|Sublime Text 4
 
 # --- Image viewer ------------------------------------------------------------------
-IMAGEVIEWER|gwenview|org.kde.gwenview|repo|Gwenview (KDE - kept from current setup)
-IMAGEVIEWER|qimgv|qimgv|aur|qimgv (current secondary viewer)
+IMAGEVIEWER|gwenview|org.kde.gwenview|repo|Gwenview (KDE)
+IMAGEVIEWER|qimgv|qimgv|aur|qimgv (lightweight Qt viewer)
 IMAGEVIEWER|imv|imv|repo|imv (minimal / Wayland-native)
 IMAGEVIEWER|loupe|loupe|repo|Loupe (GNOME)
 
 # --- Document/PDF viewer ------------------------------------------------------------
-DOCVIEWER|okular|okular|repo|Okular (KDE - kept from current setup)
+DOCVIEWER|okular|okular|repo|Okular (KDE)
 DOCVIEWER|zathura|zathura|repo|Zathura (minimal / vim-like keys)
 DOCVIEWER|evince|evince|repo|Evince (GNOME)
 
 # --- Media player ---------------------------------------------------------------
-MEDIAPLAYER|mpv|mpv|repo|mpv (current default)
+MEDIAPLAYER|mpv|mpv|repo|mpv (minimal / scriptable)
 MEDIAPLAYER|celluloid|celluloid|repo|Celluloid (GNOME / mpv-based GUI)
 MEDIAPLAYER|vlc|vlc|repo|VLC
 
 # --- Messenger/chat --------------------------------------------------------------
-MESSENGER|Hermes|hermes|repo|Hermes (this assistant's desktop app - special-cased, see apps.conf)
 MESSENGER|telegram-desktop|telegram-desktop|repo|Telegram Desktop
 MESSENGER|discord|discord|repo|Discord (official client)
 MESSENGER|vesktop|vesktop|aur|Vesktop (Discord - better Wayland support)
 MESSENGER|ferdium|ferdium|aur|Ferdium (multi-service messenger hub)
+
+# --- Terminal / TUI editor ($VISUAL) ---------------------------------------
+#  $VISUAL is what CLI tools (git commit, sudoedit, less) open. Keep it a
+#  TERMINAL editor; a GUI app here breaks git commit inside a TTY.
+VISUAL|neovim|nvim|repo|Neovim
+VISUAL|vim|vim|repo|Vim
+VISUAL|helix|hx|repo|Helix (modal / batteries-included)
+VISUAL|nano|nano|repo|nano (simplest)
+
+# --- Archive manager ------------------------------------------------------
+ARCHIVEMANAGER|ark|ark|repo|Ark (KDE)
+ARCHIVEMANAGER|file-roller|file-roller|repo|File Roller (GNOME)
+ARCHIVEMANAGER|xarchiver|xarchiver|repo|Xarchiver (lightweight / GTK)

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  10-packages.sh - install mango + Noctalia v5, skip anything already present
+#  10-packages.sh - install mango + DankMaterialShell, skip what is present
 # =============================================================================
-#  This system already has ~117 explicitly installed packages including a
-#  working KDE Plasma, NVIDIA driver, and terminal/shell tooling. This script
-#  reads packages/packages.txt and installs ONLY what is missing, routing
-#  each package to pacman (official repos) or yay (AUR) automatically.
+#  Reads packages/packages.txt and installs ONLY what is missing, routing each
+#  package to pacman (official repos) or yay (AUR) automatically. Anything
+#  already installed is left alone, so the script is safe to re-run.
 #
-#  It does NOT remove or touch KDE packages; that happens later and
-#  separately in 70-remove-plasma.sh, only after mango is verified working.
+#  It is purely additive: it never removes packages. If you are coming from
+#  another desktop environment, uninstall it yourself once mango is verified
+#  working.
 #
 #  Usage:
 #    ./10-packages.sh [--dry-run] [--with-optional]
@@ -138,8 +138,10 @@ fi
 step "Installing AUR packages"
 if ((${#NEED_AUR[@]})); then
   if ! command -v yay &>/dev/null; then
-    err "yay not found. This system already had it installed previously;"
-    err "if it is genuinely missing, install it manually first."
+    err "yay not found, but AUR packages are required."
+    err "Install an AUR helper first, e.g.:"
+    err "  sudo pacman -S --needed git base-devel"
+    err "  git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
     exit 1
   fi
   FAILED=()

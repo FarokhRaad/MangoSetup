@@ -44,7 +44,7 @@ alias hibernate='systemctl hibernate'
 alias lock='loginctl lock-session'
 
 # -----------------------------------------------------
-# mango / Noctalia
+# mango / DMS
 # -----------------------------------------------------
 #  Quick reload after editing a mango config file by hand.
 alias mango-reload='mmsg dispatch reload_config'

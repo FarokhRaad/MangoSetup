@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  30-system-tweaks.sh - fix the one known bug, skip everything else
+#  30-system-tweaks.sh - repair mkinitcpio, report optional host tweaks
 # =============================================================================
-#  This system already has a working KDE Plasma install with fstab, NVIDIA,
-#  mkinitcpio and modprobe all configured, and the old
-#  Improvements/personalized_improvements.sh tweaks already applied:
-#    - Logitech Bolt wake-disable udev rule       : present
-#    - snd_hda_intel autosuspend disabled          : present
-#    - logind lid-switch handling (ignore)         : present
-#    - pacman.conf tuning (Color/ParallelDownloads): present
+#  Deliberately minimal and conservative: it does NOT install drivers, write
+#  fstab, or apply system tweaks on your behalf. Run 00-preflight.sh first;
+#  this script sources its facts file and acts on exactly one thing it can
+#  safely repair:
 #
-#  This script does NOT redo any of that. Run 00-preflight.sh first; this
-#  script reads its fact file and only acts on the ONE thing preflight
-#  found actually broken: a duplicated MODULES= line in mkinitcpio.conf
-#  (an old sed-based script matched both the empty-parens and the
-#  populated-parens pattern and ran twice).
+#    - a duplicated MODULES= line in /etc/mkinitcpio.conf. Repeated sed-based
+#      edits (a common hand-rolled pattern) can match both the empty-parens
+#      and the populated-parens form and append the nvidia modules twice.
+#      The line is rebuilt from scratch with each module exactly once, then
+#      the initramfs is regenerated.
 #
-#  Everything else is a no-op with a confirmation printed, so this is safe
-#  to run on this machine even though most of it will do nothing.
+#  Everything else is reported only. These optional host tweaks are listed
+#  for visibility and left entirely alone whether present or not:
+#    - Logitech Bolt wake-disable udev rule
+#    - snd_hda_intel autosuspend disable
+#    - logind lid-switch handling (ignore)
+#    - pacman.conf tuning (Color / ParallelDownloads)
+#
+#  Because the non-mkinitcpio sections are pure reporting, this script is
+#  safe to run repeatedly on any host; most of it will simply do nothing.
 #
 #  Usage: ./30-system-tweaks.sh [--dry-run]
 # =============================================================================
@@ -35,7 +39,7 @@ info() { printf '%s[INFO]%s %s\n' "$BLUE" "$NC" "$*"; }
 step() { printf '\n%s=== %s ===%s\n' "$BOLD" "$*" "$NC"; }
 run() { if $DRY_RUN; then printf '%s[DRY]%s %s\n' "$YELLOW" "$NC" "$*"; else "$@"; fi; }
 
-STATE_DIR="$HOME/.local/state/mango-migration"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mangosetup"
 FACTS="$STATE_DIR/preflight-facts.env"
 if [[ ! -f "$FACTS" ]]; then
   err "no preflight facts found. Run ./00-preflight.sh first."
@@ -45,7 +49,7 @@ fi
 source "$FACTS"
 
 # -----------------------------------------------------------------------------
-#  1. mkinitcpio duplicate modules (the one real bug)
+#  1. mkinitcpio duplicate modules (the only thing this script repairs)
 # -----------------------------------------------------------------------------
 step "mkinitcpio MODULES="
 if [[ "${MKINITCPIO_DUPLICATE_BUG:-0}" == "1" ]]; then
@@ -70,17 +74,17 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-#  2. Everything else: confirm already applied, do not touch
+#  2. Everything else: report state only, do not touch
 # -----------------------------------------------------------------------------
-step "Previously-applied tweaks (confirm only)"
+step "Optional host tweaks (report only)"
 
 check_already_done() {
   local label="$1" flag="$2"
   if [[ "${!flag:-0}" == "1" ]]; then
-    ok "$label: already applied, skipping"
+    ok "$label: present, skipping"
   else
-    warn "$label: NOT applied on this system"
-    warn "  (not touched by this script; see NOTES.md if you want it added)"
+    info "$label: not present"
+    info "  (optional; not applied by this script - add it by hand if you want it)"
   fi
 }
 
@@ -91,20 +95,20 @@ check_already_done "pacman.conf tuning"                   TWEAK_PACMAN_CONF
 
 step "NVIDIA driver and KMS"
 if [[ "${HAS_NVIDIA:-0}" == "1" ]]; then
-  info "driver: ${NVIDIA_DRIVER:-unknown} (already installed, not reinstalling)"
+  info "driver: ${NVIDIA_DRIVER:-unknown} (detected; this script never installs drivers)"
   [[ "${NVIDIA_MODESET_OK:-0}" == "1" ]] && ok "modeset=1 already set" \
     || warn "modeset not confirmed; check /etc/modprobe.d/nvidia.conf manually"
   [[ "${NOUVEAU_BLACKLISTED:-0}" == "1" ]] && ok "nouveau already blacklisted" \
     || info "nouveau not blacklisted (fine on a desktop-only NVIDIA GPU)"
 else
-  info "no NVIDIA GPU on this system"
+  info "no NVIDIA GPU detected"
 fi
 
 step "fstab"
 if [[ "${FSTAB_OK:-0}" == "1" ]]; then
-  ok "fstab already has working network mounts, not touched"
+  ok "network mounts already declared in fstab, not touched"
 else
-  warn "fstab state unclear; check manually, this script will not modify fstab"
+  info "no known network mounts in fstab; this script never modifies fstab"
 fi
 
 step "Summary"

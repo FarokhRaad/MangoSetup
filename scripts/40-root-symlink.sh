@@ -9,13 +9,13 @@
 #  your home into /root so root's GUI apps pick up the same theme.
 #
 #  Deliberately narrow: this links THEMING config only (GTK settings, Qt
-#  theming, icons, cursors, fonts, the Noctalia-generated color files). It
+#  theming, icons, cursors, fonts, the shell-generated color files). It
 #  does NOT link your shell config, mango config, or anything with secrets
 #  or session-specific state; root does not need your compositor session,
 #  it needs matching visuals for the rare GUI dialog it pops up.
 #
 #  Based on the same approach as the older MangoSetup/symlink.sh, extended
-#  to cover qt5ct/qt6ct and the Noctalia template outputs.
+#  to cover qt5ct/qt6ct and the matugen-generated palette files.
 #
 #  Usage:
 #    sudo ./40-root-symlink.sh              link everything below

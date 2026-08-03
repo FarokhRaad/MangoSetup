@@ -1,27 +1,25 @@
 # =============================================================================
-#  Package manifest for mango + Noctalia Shell
+#  Package manifest for mango + DankMaterialShell
 # =============================================================================
 #  Format:  one package per line. '#' starts a comment.
 #           Lines ending in "  # optional" are skipped unless --with-optional
 #           is passed to 10-packages.sh.
 #
 #  The installer routes each package to pacman or the AUR automatically and
-#  SKIPS anything already installed, so this is safe to re-run.
+#  skips anything already present, so this is safe to re-run.
 #
-#  Packages the old manifest listed that are intentionally gone:
-#    dms-shell-bin           replaced by Noctalia
-#    dgop                    DankMaterialShell system monitor backend
-#    greetd-dms-greeter-git  replaced by greetd + tuigreet
-#    quickshell / quickshell-git
-#                            NOT NEEDED. Noctalia v5 is native C++ and dropped
-#                            Quickshell entirely. Only v4.x required it.
-#    noctalia-shell          that package is Noctalia v4.7.7 (Quickshell/QML).
-#                            v5 is the package 'noctalia'. See below.
+#  Upstream naming traps worth knowing (all verified against pacman -Si and
+#  the AUR RPC, since a wrong name here fails the whole install):
 #    mangowc / mangowc-git   RENAMED. The project moved to the 'mangowm' org
-#                            and both old AUR names now 404.
-#    qt5ct-kde / qt6ct-kde   the plain qt5ct/qt6ct packages are in [extra]
-#    xdg-users-dirs          typo; the real package is xdg-user-dirs
-#    breeze5                 Plasma 5 leftover, not needed
+#                            and both old AUR names now 404. Use 'mangowm'.
+#    p7zip                   RENAMED upstream to '7zip'.
+#    qt5ct / qt6ct           the '-kde' variants are used here instead; see
+#                            the Qt theming section for why (they conflict,
+#                            so do not list both).
+#    xdg-users-dirs          common typo; the real package is xdg-user-dirs.
+#    dgop-git                its PKGBUILD builds ./cmd/cli, but upstream
+#                            renamed that path to cmd/dgop, so the git
+#                            package FAILS to build. Use 'dgop-bin'.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -37,19 +35,34 @@ mangowm
 wlr-randr
 
 # -----------------------------------------------------------------------------
-#  Shell (Noctalia v5)
+#  Shell (DankMaterialShell)
 # -----------------------------------------------------------------------------
-#  Noctalia v5 is a native C++/Wayland/OpenGL-ES rewrite. It has NO Qt, NO GTK
-#  and NO Quickshell dependency. Config is TOML, IPC is `noctalia msg`.
+#  DMS is a Quickshell (QML) + Go desktop shell. It has genuine first-class
+#  mango support, not a generic wlroots fallback: it ships a MangoService
+#  that speaks mango's native JSON-over-Unix-socket IPC, and `dms setup
+#  <fragment>` generates mango config fragments into ~/.config/mango/dms/
+#  (colors, layout, cursor, outputs, windowrules, binds), which config.conf
+#  sources last. Docs: https://danklinux.com/docs/
 #
-#  AUR names verified 2026-07-30:
-#    noctalia            5.0.0_beta.6-2   <- v5, used here
-#    noctalia-git        5.0.0.r1191...   v5 tracking main
-#    noctalia-shell      4.7.7-3          OLD v4 Quickshell/QML generation
-#
-#  v5 is in beta. If you want to pin to the tested beta rather than follow
-#  main, keep 'noctalia'; switch to 'noctalia-git' to track development.
-noctalia
+#  Package choice:
+#    dms-shell       stable, in the official [extra] repo
+#    dms-shell-git   AUR, tracks main
+#  Listed as the git package to stay current with mango IPC changes; switch
+#  to 'dms-shell' from [extra] if you prefer stable.
+dms-shell-git
+
+#  Quickshell is DMS's ONLY hard UI dependency (in [extra], no AUR fork
+#  needed). DMS embeds its QML in the dms binary but still needs the runtime.
+quickshell
+
+#  dgop is DMS's system-metrics backend (CPU/mem/disk/net), a hard dependency.
+#  IMPORTANT: use dgop-bin, NOT dgop-git. The git PKGBUILD builds ./cmd/cli,
+#  which upstream renamed to cmd/dgop, so dgop-git fails with
+#  "stat .../cmd/cli: directory not found".
+dgop-bin
+
+#  accountsservice: hard dependency of dms-shell (user avatar / account info).
+accountsservice
 
 # -----------------------------------------------------------------------------
 #  Shell runtime dependencies
@@ -58,18 +71,20 @@ noctalia
 matugen
 
 #  wl-clipboard provides wl-copy/wl-paste for scripts and CLI use.
-#  NOTE: cliphist is NOT needed on Noctalia v5. v5 implements clipboard
-#  history internally, so running cliphist too means two processes racing to
-#  own the same Wayland selection. Only add it if you disable
-#  [shell] clipboard_enabled and want an external picker.
+#  NOTE: cliphist is NOT needed. DMS implements clipboard history itself
+#  (IPC target `clipboard`: open/close/toggle, bound to SUPER+v in DMS's own
+#  binds fragment), so running cliphist too means two processes racing to own
+#  the same Wayland selection. Only add it if you want an external picker.
 wl-clipboard
 
-#  Screenshots: v5 has a built-in screenshot service, so grim/slurp are not
-#  required for the Print bindings. Kept because they are tiny and many
-#  scripts and other tools still expect them.
+#  Screenshots: DMS has a built-in screenshot service (`dms screenshot`,
+#  bound to the Print keys in its binds fragment), so grim/slurp are not
+#  required for those. Kept because they are tiny and many scripts and other
+#  tools still expect them.
 grim
 slurp
-#  Colour picker: no Noctalia equivalent, still needed for SUPER+SHIFT+C.
+#  Colour picker. DMS has one too (IPC target `color-picker`), but hyprpicker
+#  is kept as the external CLI alternative used by SUPER+SHIFT+C.
 hyprpicker
 
 #  Brightness: brightnessctl drives the laptop panel (eDP-1) via sysfs.
@@ -83,14 +98,15 @@ hyprpicker
 #                              failed (DDCRC_RETRIES / DDCRC_READ_ALL_ZERO).
 #  Kept installed anyway: it is the only way to retry after enabling the
 #  DDC/CI option in each BenQ's OSD menu (ships disabled on many units).
-#  Noctalia's config.toml sets enable_ddcutil = false to match reality;
-#  flip it back to true if `ddcutil -d 1 setvcp 10 80` ever succeeds.
+#  DMS reads brightness backends itself; ddcutil stays installed so external
+#  monitor control starts working the moment DDC/CI is enabled in the OSD.
+#  Retest with: ddcutil detect && ddcutil -d 1 setvcp 10 80
 ddcutil
 brightnessctl
 i2c-tools
 
-#  Audio (PipeWire stack). Noctalia talks to WirePlumber for volume and
-#  per-app streams.
+#  Audio (PipeWire stack). DMS talks to WirePlumber for volume and per-app
+#  streams (IPC target `audio`).
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -122,21 +138,18 @@ lm_sensors
 # -----------------------------------------------------------------------------
 #  Session / login
 # -----------------------------------------------------------------------------
-#  Noctalia Greeter: a greetd greeter with a bundled wlroots compositor, so
-#  the login screen matches the shell. Pulls in greetd itself.
+#  DMS greeter: a greetd greeter matching the shell's look, so the login
+#  screen is visually consistent with the desktop. Pulls in greetd itself.
 #  NOTE: do NOT enable greetd.service until mango is verified working.
-#  60-session.sh performs the SDDM -> greetd switch with a rollback path.
-noctalia-greeter
+#  60-session.sh performs the display-manager switch with a rollback path.
+greetd-dms-greeter-bin
 
-#  Polkit agent: NOT needed as a separate package. Noctalia v5 ships its own
-#  agent; enable it with [shell] polkit_agent = true in the Noctalia config.
-#  polkit-kde-agent is being removed with Plasma (it is required by
-#  plasma-desktop/plasma-meta only).
-#  Uncomment only if you disable Noctalia's built-in agent:
+#  Polkit agent: NOT needed as a separate package. DMS ships its own polkit
+#  agent as part of the shell. Uncomment one only if you disable it:
 # mate-polkit
 
-#  Keyring / secret storage. Noctalia v5 links libsecret (see meson.build),
-#  which gnome-keyring provides, so kwallet is not required.
+#  Keyring / secret storage. gnome-keyring + libsecret is the standard
+#  Wayland-agnostic pairing and is what DMS-adjacent apps expect.
 gnome-keyring
 libsecret
 
@@ -234,7 +247,7 @@ ttf-ms-fonts  # optional
 #    kvantum           qt6ct-kde handles Qt theming
 #    kwalletmanager    gnome-keyring/libsecret is used instead
 #    kdialog           nothing in this setup calls it
-#    polkit-kde-agent  Noctalia v5 has a built-in polkit agent
+#    polkit-kde-agent  DMS ships its own polkit agent
 dolphin
 dolphin-plugins
 ffmpegthumbs

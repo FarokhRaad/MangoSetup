@@ -24,22 +24,26 @@
 .state/
 *.log
 
-# --- Files Noctalia GENERATES into config dirs -------------------------------
-#  These are written by Noctalia's builtin theme templates
-#  ([theme.templates].builtin_ids in configs/.config/noctalia/config.toml),
-#  derived live from the current wallpaper/palette. They are OUTPUT, not
-#  source, and they change on every wallpaper/theme switch.
-configs/.config/mango/noctalia.conf
-configs/.config/qt5ct/colors/noctalia.conf
-configs/.config/qt6ct/colors/noctalia.conf
-configs/.config/gtk-3.0/noctalia.css
-configs/.config/gtk-4.0/noctalia.css
+# --- Files the SHELL generates into config dirs ------------------------------
+#  DankMaterialShell owns these. `dms setup <fragment>` regenerates them, and
+#  its Settings UI rewrites cursor/outputs/windowrules live, so they are
+#  OUTPUT, not source. config.conf sources them with source-optional= exactly
+#  so a fresh clone works before `dms setup` has ever run.
+configs/.config/mango/dms/
 
-# --- Noctalia runtime state --------------------------------------------------
-#  Noctalia writes its own mutable settings/state next to the user config.
-configs/.config/noctalia/settings.toml
-configs/.config/noctalia/state/
-configs/.config/noctalia/cache/
+#  matugen/DMS-generated theme output for GTK and Qt.
+configs/.config/qt5ct/colors/*.conf
+configs/.config/qt6ct/colors/*.conf
+configs/.config/gtk-3.0/*-colors.css
+configs/.config/gtk-4.0/*-colors.css
+
+# --- DMS runtime state -------------------------------------------------------
+#  Written by the shell at runtime, per-machine, not configuration.
+configs/.config/DankMaterialShell/settings.json
+configs/.config/DankMaterialShell/session.json
+configs/.config/DankMaterialShell/clsettings.json
+configs/.config/DankMaterialShell/plugin_settings.json
+configs/.config/DankMaterialShell/dms-colors.json
 
 # --- Caches that can land under a symlinked config dir ----------------------
 configs/.config/fontconfig/cache/

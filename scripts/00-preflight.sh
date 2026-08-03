@@ -2,18 +2,25 @@
 # =============================================================================
 #  00-preflight.sh - survey the system before touching anything
 # =============================================================================
-#  This machine already has a WORKING, CONFIGURED KDE Plasma install:
-#  fstab, NVIDIA driver, mkinitcpio, modprobe tweaks, and the personalized
-#  system tweaks (udev, audio power save, lid switch, pacman.conf) are all
-#  already applied. This script's job is to CONFIRM that and flag the one
-#  known bug, NOT to redo any of it.
+#  READ-ONLY. This script modifies nothing. It surveys the machine it is run
+#  on and records what it finds:
+#    - GPU and which graphics driver package (if any) is installed
+#    - bootloader (limine / systemd-boot / GRUB)
+#    - snapper / snapshot support on the root subvolume
+#    - display manager currently enabled
+#    - network (CIFS) mounts already declared in fstab
+#    - optional host tweaks (udev, audio power save, lid switch, pacman.conf)
+#    - the current desktop session, if any
 #
-#  Every later script in this directory checks state before acting and
-#  skips anything already correct. This one just makes that state visible
-#  and writes a fact file the others can read.
+#  Findings are written as shell variables to a facts file that the later
+#  scripts source, so they can adapt to this host and skip anything that is
+#  already in the desired state instead of blindly reapplying it.
+#
+#  Run this first. Nothing else in the repo depends on a particular starting
+#  desktop or distro state beyond Arch + pacman.
 #
 #  Usage: ./00-preflight.sh
-#  Writes: ~/.local/state/mango-migration/preflight-facts.env
+#  Writes: ~/.local/state/mangosetup/preflight-facts.env
 # =============================================================================
 set -uo pipefail
 
@@ -25,7 +32,7 @@ warn() { printf '%s[WARN]%s %s\n' "$YELLOW" "$NC" "$*"; }
 info() { printf '%s[INFO]%s %s\n' "$BLUE" "$NC" "$*"; }
 step() { printf '\n%s=== %s ===%s\n' "$BOLD" "$*" "$NC"; }
 
-STATE_DIR="$HOME/.local/state/mango-migration"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mangosetup"
 mkdir -p "$STATE_DIR"
 FACTS="$STATE_DIR/preflight-facts.env"
 : > "$FACTS"
@@ -54,7 +61,7 @@ if command -v snapper >/dev/null 2>&1 && snapper list-configs 2>/dev/null | grep
   ok "snapper configured for the root subvolume"
   fact HAS_SNAPPER 1
 else
-  warn "snapper not configured; 70-remove-plasma.sh will skip the safety snapshot"
+  warn "snapper not configured; no pre-change safety snapshot will be available"
   fact HAS_SNAPPER 0
 fi
 if pacman -Qi limine-snapper-sync &>/dev/null; then
@@ -77,8 +84,9 @@ if [[ -n "$GPU_LINE" ]]; then
     fact NVIDIA_DRIVER none
   fi
 
-  #  The known mkinitcpio bug: an earlier script's sed ran twice and
-  #  duplicated the nvidia modules. Detect it precisely rather than assume.
+  #  A sed-based MODULES= edit that runs more than once can append the nvidia
+  #  modules twice, which breaks the initramfs. Detect it precisely by
+  #  counting occurrences rather than assuming either way.
   MODULES_LINE=$(grep '^MODULES=' /etc/mkinitcpio.conf 2>/dev/null || true)
   info "mkinitcpio MODULES= $MODULES_LINE"
   nvidia_count=$(grep -o 'nvidia_drm' <<<"$MODULES_LINE" | wc -l)
@@ -115,9 +123,10 @@ else
   fact HAS_NVIDIA 0
 fi
 
-step "Personalized system tweaks (from the previous setup)"
-#  Each of these was applied by the OLD Improvements/personalized_improvements.sh.
-#  Report state; 30-system-tweaks.sh will only touch what is missing.
+step "Optional host tweaks"
+#  These are quality-of-life host tweaks this setup can benefit from but does
+#  not require. Report their state only; 30-system-tweaks.sh reads these facts
+#  and leaves anything already in place untouched.
 if [[ -f /etc/udev/rules.d/90-disable-logi-bolt-wake.rules ]]; then
   ok "Logitech Bolt wake-disable udev rule present"
   fact TWEAK_UDEV_LOGI 1
@@ -151,14 +160,16 @@ else
 fi
 
 step "fstab"
-#  The OLD fstab.sh targeted a hardcoded //10.0.0.3 SMB host. This system
-#  actually mounts //hydra.lan via a credentials file, already working.
-#  fstab.sh is NOT included in this repo: there is nothing to generate.
+#  This repo never generates or edits fstab. Network storage is host-specific,
+#  so if CIFS/SMB mounts are already present and working they are left
+#  untouched; if you need them, add them by hand. The check below looks for
+#  the hydra.lan share this config's file manager bookmarks expect, purely as
+#  an informational hint.
 if grep -q 'hydra.lan' /etc/fstab 2>/dev/null; then
-  ok "fstab already has working hydra.lan CIFS mounts; nothing to do here"
+  ok "fstab declares hydra.lan CIFS mounts; left untouched"
   fact FSTAB_OK 1
 else
-  warn "fstab does not reference hydra.lan; if network storage changed, handle manually"
+  info "fstab does not reference hydra.lan; add any network mounts you need manually"
   fact FSTAB_OK 0
 fi
 
