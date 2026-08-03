@@ -1,0 +1,80 @@
+# =============================================================================
+#  App catalog: candidate apps per role, for scripts/setup.sh's interactive
+#  picker.
+# =============================================================================
+#  Verified 2026-07-30 against pacman -Si (repo) and the AUR RPC (AUR), plus
+#  each AUR package's PKGBUILD where the installed binary name differs from
+#  the package name (a real trap: e.g. package microsoft-edge-stable-bin
+#  installs binary `microsoft-edge-stable`; package sublime-text-4 installs
+#  binary `subl`, not `sublime-text-4`).
+#
+#  Format per line (pipe-separated, no spaces around pipes):
+#    role|package|binary|source|label
+#  role    : matches a $ROLE in configs/.config/mango/conf/apps.conf
+#  package : exact pacman/AUR package name to install
+#  binary  : exact command name to check with `command -v` / launch
+#  source  : repo | aur
+#  label   : human-readable name shown in the picker
+#
+#  This file is DATA for scripts/setup.sh, not sourced by mango or bash.
+#  Multiple apps per role are expected and supported: the picker is a
+#  multi-select (gum choose --no-limit), so e.g. selecting Firefox, Edge,
+#  and Brave together installs and registers all three; scripts/apps.conf
+#  and scripts/swap-app.sh (single active default via $ROLE) still control
+#  which ONE of the installed set mango/exec-once actually launches by
+#  default at any given time, per app.conf's own header.
+# =============================================================================
+
+# --- Terminal -----------------------------------------------------------------
+TERMINAL|konsole|konsole|repo|Konsole (KDE - kept from current setup)
+TERMINAL|kitty|kitty|repo|kitty (GPU-accelerated)
+TERMINAL|alacritty|alacritty|repo|Alacritty (GPU-accelerated / minimal)
+TERMINAL|foot|foot|repo|foot (lightweight / Wayland-native)
+TERMINAL|wezterm|wezterm|repo|WezTerm (GPU-accelerated / Lua config)
+
+# --- Browser -------------------------------------------------------------------
+BROWSER|microsoft-edge-stable-bin|microsoft-edge-stable|aur|Microsoft Edge (current default)
+BROWSER|firefox|firefox|repo|Firefox
+BROWSER|chromium|chromium|repo|Chromium
+BROWSER|brave-bin|brave|aur|Brave
+BROWSER|vivaldi|vivaldi|repo|Vivaldi
+BROWSER|zen-browser-bin|zen-browser|aur|Zen Browser
+BROWSER|floorp-bin|floorp|aur|Floorp
+
+# --- File manager ---------------------------------------------------------------
+FILEMANAGER|dolphin|dolphin|repo|Dolphin (KDE - kept from current setup)
+FILEMANAGER|nautilus|nautilus|repo|Nautilus (GNOME Files)
+FILEMANAGER|nemo|nemo|repo|Nemo (Cinnamon)
+FILEMANAGER|thunar|thunar|repo|Thunar (XFCE)
+FILEMANAGER|pcmanfm-qt|pcmanfm-qt|repo|PCManFM-Qt (LXQt)
+
+# --- Editor (code/text) ----------------------------------------------------------
+EDITOR|code|code|repo|Visual Studio Code (current default)
+GUI_EDITOR|code|code|repo|Visual Studio Code (current default)
+EDITOR|neovim|nvim|repo|Neovim
+EDITOR|helix|hx|repo|Helix
+GUI_EDITOR|zed|zed|repo|Zed
+GUI_EDITOR|sublime-text-4|subl|aur|Sublime Text 4
+
+# --- Image viewer ------------------------------------------------------------------
+IMAGEVIEWER|gwenview|org.kde.gwenview|repo|Gwenview (KDE - kept from current setup)
+IMAGEVIEWER|qimgv|qimgv|aur|qimgv (current secondary viewer)
+IMAGEVIEWER|imv|imv|repo|imv (minimal / Wayland-native)
+IMAGEVIEWER|loupe|loupe|repo|Loupe (GNOME)
+
+# --- Document/PDF viewer ------------------------------------------------------------
+DOCVIEWER|okular|okular|repo|Okular (KDE - kept from current setup)
+DOCVIEWER|zathura|zathura|repo|Zathura (minimal / vim-like keys)
+DOCVIEWER|evince|evince|repo|Evince (GNOME)
+
+# --- Media player ---------------------------------------------------------------
+MEDIAPLAYER|mpv|mpv|repo|mpv (current default)
+MEDIAPLAYER|celluloid|celluloid|repo|Celluloid (GNOME / mpv-based GUI)
+MEDIAPLAYER|vlc|vlc|repo|VLC
+
+# --- Messenger/chat --------------------------------------------------------------
+MESSENGER|Hermes|hermes|repo|Hermes (this assistant's desktop app - special-cased, see apps.conf)
+MESSENGER|telegram-desktop|telegram-desktop|repo|Telegram Desktop
+MESSENGER|discord|discord|repo|Discord (official client)
+MESSENGER|vesktop|vesktop|aur|Vesktop (Discord - better Wayland support)
+MESSENGER|ferdium|ferdium|aur|Ferdium (multi-service messenger hub)

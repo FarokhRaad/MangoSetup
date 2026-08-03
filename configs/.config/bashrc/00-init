@@ -1,0 +1,28 @@
+# -----------------------------------------------------
+# INIT
+# -----------------------------------------------------
+#  NOTE: ~/.config/bashrc/ did not exist on this machine before MangoSetup;
+#  only ~/.zshrc had a live modular config (~/.config/zshrc/), since zsh is
+#  the login shell. This bashrc mirrors that setup's structure and exports
+#  for consistency, rather than the older, stale MangoSetup bashrc/00-init,
+#  which referenced oh-my-posh and a ccache PATH entry that do not apply to
+#  this system's actual toolchain.
+
+# Enable programmable completion features
+if [[ -n $PS1 && -f /usr/share/bash-completion/bash_completion ]]; then
+    source /usr/share/bash-completion/bash_completion
+fi
+
+# Enable fzf key bindings
+[ -f /usr/share/fzf/completion.bash ] && source /usr/share/fzf/completion.bash
+[ -f /usr/share/fzf/key-bindings.bash ] && source /usr/share/fzf/key-bindings.bash
+
+# Enable zoxide
+eval "$(zoxide init bash)"
+
+# -----------------------------------------------------
+# Exports
+# -----------------------------------------------------
+export EDITOR=nvim
+export VISUAL=code
+export PATH="$HOME/.local/bin:$PATH"

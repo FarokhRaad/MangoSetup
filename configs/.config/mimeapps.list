@@ -1,0 +1,71 @@
+# =============================================================================
+#  Default application associations
+# =============================================================================
+#  MIGRATION NOTE: the live mimeapps.list on this machine referenced several
+#  .desktop files for apps that are no longer installed (dragonplayer,
+#  floorp, brave-browser, vlc, vesktop) and one KDE-specific entry
+#  (userapp-Floorp-U3OXG3.desktop) tied to a since-removed browser profile.
+#  Opening those mimetypes would fall through to nothing or a "not found"
+#  error. Rewritten below against apps actually present, and to line up with
+#  the roles in configs/.config/mango/conf/apps.conf.
+#
+#  IMPORTANT: like Noctalia's dock.pinned list, this file has NO connection
+#  to apps.conf's $ROLE variables; xdg-mime/mimeapps.list only understands
+#  literal .desktop filenames. If you swap BROWSER or FILEMANAGER with
+#  scripts/swap-app.sh, update the matching lines here too (or just run
+#  `xdg-mime default <new-app>.desktop <mimetype>` for the handful you use).
+# =============================================================================
+[Default Applications]
+inode/directory=org.kde.dolphin.desktop
+
+text/html=microsoft-edge.desktop
+x-scheme-handler/http=microsoft-edge.desktop
+x-scheme-handler/https=microsoft-edge.desktop
+x-scheme-handler/about=microsoft-edge.desktop
+x-scheme-handler/unknown=microsoft-edge.desktop
+x-scheme-handler/chrome=microsoft-edge.desktop
+
+application/pdf=org.kde.okular.desktop
+
+image/png=org.kde.gwenview.desktop
+image/jpeg=org.kde.gwenview.desktop
+image/bmp=org.kde.gwenview.desktop
+image/webp=org.kde.gwenview.desktop
+image/avif=org.kde.gwenview.desktop
+image/heif=org.kde.gwenview.desktop
+image/x-icns=org.kde.gwenview.desktop
+
+audio/mpeg=mpv.desktop
+audio/ogg=mpv.desktop
+audio/x-wav=mpv.desktop
+video/mp4=mpv.desktop
+video/webm=mpv.desktop
+video/x-matroska=mpv.desktop
+video/quicktime=mpv.desktop
+video/mpeg=mpv.desktop
+video/x-msvideo=mpv.desktop
+
+application/zip=org.kde.ark.desktop
+application/x-tar=org.kde.ark.desktop
+application/x-compressed-tar=org.kde.ark.desktop
+application/x-bzip-compressed-tar=org.kde.ark.desktop
+application/x-xz-compressed-tar=org.kde.ark.desktop
+application/x-7z-compressed=org.kde.ark.desktop
+
+application/json=code.desktop
+application/schema+json=code.desktop
+application/x-shellscript=code.desktop
+application/x-zerosize=code.desktop
+text/plain=code.desktop
+text/markdown=code.desktop
+text/x-csrc=code.desktop
+text/javascript=code.desktop
+
+[Added Associations]
+text/html=microsoft-edge.desktop;
+x-scheme-handler/http=microsoft-edge.desktop;
+x-scheme-handler/https=microsoft-edge.desktop;
+image/png=org.kde.gwenview.desktop;qimgv.desktop;
+image/jpeg=org.kde.gwenview.desktop;qimgv.desktop;
+image/webp=org.kde.gwenview.desktop;qimgv.desktop;
+text/markdown=code.desktop;org.kde.okular.desktop;nvim.desktop;

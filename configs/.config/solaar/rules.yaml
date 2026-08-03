@@ -1,0 +1,40 @@
+%YAML 1.3
+---
+# =============================================================================
+#  Solaar custom rules (Logitech MX Master 3S gestures/thumb wheel)
+# =============================================================================
+#  MIGRATION FIX: the mouse-gesture rules below used to call
+#    Execute: [mmsg, -d, 'exchange_client,right']
+#  `mmsg -d` was mango's OLD flag-based CLI. mango 0.15.5's mmsg replaced it
+#  with subcommands (`mmsg dispatch ...` / `mmsg get ...` / `mmsg watch ...`;
+#  see scripts/validate-config.sh's header for the full breaking-change
+#  list). The old syntax fails silently: mmsg just prints its usage text and
+#  exits 1, so the gesture appeared to do nothing. Fixed below.
+#
+#  config.yaml (per-device state: pairing, DPI, button remaps) is NOT
+#  templated here; Solaar regenerates it from the physical device on first
+#  connection, and it is tied to this specific mouse's serial number.
+# =============================================================================
+- Rule:
+  - Test: thumb_wheel_up
+  - Execute: [pactl, set-sink-volume, '@DEFAULT_SINK@', +1%]
+- Rule:
+  - Test: thumb_wheel_down
+  - Execute: [pactl, set-sink-volume, '@DEFAULT_SINK@', -1%]
+...
+---
+- Rule:
+  - MouseGesture: Mouse Right
+  - Execute: [mmsg, dispatch, 'exchange_client,right']
+- Rule:
+  - MouseGesture: Mouse Left
+  - Execute: [mmsg, dispatch, 'exchange_client,left']
+...
+---
+- Rule:
+  - MouseGesture: Mouse Up
+  - Execute: [mmsg, dispatch, togglemaximizescreen]
+- Rule:
+  - MouseGesture: Mouse Down
+  - Execute: [mmsg, dispatch, togglefloating]
+...

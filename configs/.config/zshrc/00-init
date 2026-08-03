@@ -1,0 +1,16 @@
+# -----------------------------------------------------
+# INIT
+# -----------------------------------------------------
+
+[ -f "$CLAUDE_CONFIG_DIR/.claude.json" ] && chmod u+rw "$CLAUDE_CONFIG_DIR/.claude.json" 2>/dev/null
+
+# -----------------------------------------------------
+# Exports
+# -----------------------------------------------------
+export EDITOR=nvim
+export VISUAL=code
+export ZSH="$HOME/.oh-my-zsh"
+export PATH="$HOME/.local/bin:$PATH"
+
+export CLAUDE_CONFIG_DIR="/mnt/Data/Claude/config"
+[ -f "$CLAUDE_CONFIG_DIR/.claude.json" ] && chmod u+rw "$CLAUDE_CONFIG_DIR/.claude.json" 2>/dev/null

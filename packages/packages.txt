@@ -1,0 +1,267 @@
+# =============================================================================
+#  Package manifest for mango + Noctalia Shell
+# =============================================================================
+#  Format:  one package per line. '#' starts a comment.
+#           Lines ending in "  # optional" are skipped unless --with-optional
+#           is passed to 10-packages.sh.
+#
+#  The installer routes each package to pacman or the AUR automatically and
+#  SKIPS anything already installed, so this is safe to re-run.
+#
+#  Packages the old manifest listed that are intentionally gone:
+#    dms-shell-bin           replaced by Noctalia
+#    dgop                    DankMaterialShell system monitor backend
+#    greetd-dms-greeter-git  replaced by greetd + tuigreet
+#    quickshell / quickshell-git
+#                            NOT NEEDED. Noctalia v5 is native C++ and dropped
+#                            Quickshell entirely. Only v4.x required it.
+#    noctalia-shell          that package is Noctalia v4.7.7 (Quickshell/QML).
+#                            v5 is the package 'noctalia'. See below.
+#    mangowc / mangowc-git   RENAMED. The project moved to the 'mangowm' org
+#                            and both old AUR names now 404.
+#    qt5ct-kde / qt6ct-kde   the plain qt5ct/qt6ct packages are in [extra]
+#    xdg-users-dirs          typo; the real package is xdg-user-dirs
+#    breeze5                 Plasma 5 leftover, not needed
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+#  Compositor
+# -----------------------------------------------------------------------------
+#  AUR name verified 2026-07-30 via the AUR RPC:
+#    mangowm      0.15.5-1.1   tagged release   <- used here
+#    mangowm-git  1b6e01d7-1.7 latest main
+#  Requires wlroots 0.20 and scenefx 0.5 (up from 0.19/0.4 in older builds).
+mangowm
+
+#  IPC/config tooling and output management.
+wlr-randr
+
+# -----------------------------------------------------------------------------
+#  Shell (Noctalia v5)
+# -----------------------------------------------------------------------------
+#  Noctalia v5 is a native C++/Wayland/OpenGL-ES rewrite. It has NO Qt, NO GTK
+#  and NO Quickshell dependency. Config is TOML, IPC is `noctalia msg`.
+#
+#  AUR names verified 2026-07-30:
+#    noctalia            5.0.0_beta.6-2   <- v5, used here
+#    noctalia-git        5.0.0.r1191...   v5 tracking main
+#    noctalia-shell      4.7.7-3          OLD v4 Quickshell/QML generation
+#
+#  v5 is in beta. If you want to pin to the tested beta rather than follow
+#  main, keep 'noctalia'; switch to 'noctalia-git' to track development.
+noctalia
+
+# -----------------------------------------------------------------------------
+#  Shell runtime dependencies
+# -----------------------------------------------------------------------------
+#  Wallpaper-driven color scheme generation.
+matugen
+
+#  wl-clipboard provides wl-copy/wl-paste for scripts and CLI use.
+#  NOTE: cliphist is NOT needed on Noctalia v5. v5 implements clipboard
+#  history internally, so running cliphist too means two processes racing to
+#  own the same Wayland selection. Only add it if you disable
+#  [shell] clipboard_enabled and want an external picker.
+wl-clipboard
+
+#  Screenshots: v5 has a built-in screenshot service, so grim/slurp are not
+#  required for the Print bindings. Kept because they are tiny and many
+#  scripts and other tools still expect them.
+grim
+slurp
+#  Colour picker: no Noctalia equivalent, still needed for SUPER+SHIFT+C.
+hyprpicker
+
+#  Brightness: brightnessctl drives the laptop panel (eDP-1) via sysfs.
+#
+#  ddcutil drives EXTERNAL monitors over I2C/DDC, but on THIS machine
+#  DDC/CI does not work (verified 2026-08-03, ddcutil 2.2.7):
+#    DP-2     (BenQ GW2381) -> "DDC communication failed", every attempt,
+#                              including --sleep-multiplier 5.
+#    HDMI-A-1 (BenQ GW2381) -> detected in ~4 of 5 passes, reads sometimes
+#                              return brightness, but every setvcp WRITE
+#                              failed (DDCRC_RETRIES / DDCRC_READ_ALL_ZERO).
+#  Kept installed anyway: it is the only way to retry after enabling the
+#  DDC/CI option in each BenQ's OSD menu (ships disabled on many units).
+#  Noctalia's config.toml sets enable_ddcutil = false to match reality;
+#  flip it back to true if `ddcutil -d 1 setvcp 10 80` ever succeeds.
+ddcutil
+brightnessctl
+i2c-tools
+
+#  Audio (PipeWire stack). Noctalia talks to WirePlumber for volume and
+#  per-app streams.
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+
+#  MPRIS media control.
+playerctl
+
+#  Calculator backend for the launcher's calculator mode.
+libqalculate
+
+#  Network and bluetooth backends for the control center.
+networkmanager
+bluez
+bluez-utils
+
+#  Power profile switching.
+power-profiles-daemon
+
+#  Notification library.
+libnotify
+
+#  System tray support.
+libayatana-appindicator
+
+#  GPU/system monitoring for the resource widgets.
+lm_sensors
+
+# -----------------------------------------------------------------------------
+#  Session / login
+# -----------------------------------------------------------------------------
+#  Noctalia Greeter: a greetd greeter with a bundled wlroots compositor, so
+#  the login screen matches the shell. Pulls in greetd itself.
+#  NOTE: do NOT enable greetd.service until mango is verified working.
+#  60-session.sh performs the SDDM -> greetd switch with a rollback path.
+noctalia-greeter
+
+#  Polkit agent: NOT needed as a separate package. Noctalia v5 ships its own
+#  agent; enable it with [shell] polkit_agent = true in the Noctalia config.
+#  polkit-kde-agent is being removed with Plasma (it is required by
+#  plasma-desktop/plasma-meta only).
+#  Uncomment only if you disable Noctalia's built-in agent:
+# mate-polkit
+
+#  Keyring / secret storage. Noctalia v5 links libsecret (see meson.build),
+#  which gnome-keyring provides, so kwallet is not required.
+gnome-keyring
+libsecret
+
+# -----------------------------------------------------------------------------
+#  XDG portals
+# -----------------------------------------------------------------------------
+#  wlr backend handles screen sharing and screenshots on wlroots compositors.
+#  gtk backend handles file pickers and settings.
+xdg-desktop-portal
+xdg-desktop-portal-wlr
+xdg-desktop-portal-gtk
+xdg-user-dirs
+
+#  XWayland support for X11 applications.
+xorg-xwayland
+#  Only needed for crisp X11 apps under fractional scaling.
+xwayland-satellite  # optional
+
+# -----------------------------------------------------------------------------
+#  Theming
+# -----------------------------------------------------------------------------
+#  Qt theming. The -kde variants are patched to work correctly alongside the
+#  KDE platform theme, which matters here because we keep Dolphin, Okular,
+#  Gwenview, Ark and Konsole. environment.conf sets
+#  QT_QPA_PLATFORMTHEME=qt6ct.
+#  NOTE: these are AUR packages and CONFLICT with plain qt5ct/qt6ct.
+qt6ct-kde
+qt5ct-kde
+#  Kvantum is intentionally NOT included; qt6ct-kde handles Qt theming.
+#  GTK theme that matches Adwaita/libadwaita apps.
+adw-gtk-theme
+#  GTK theme/cursor/icon picker.
+nwg-look
+#  Cursor and icon theme (breeze_cursors is referenced in appearance.conf).
+breeze
+breeze-gtk
+#  Qt/KDE integration for Qt apps like Dolphin.
+kde-cli-tools
+#  Populates Dolphin's "Open With" menu (needs XDG_MENU_PREFIX=arch-).
+archlinux-xdg-menu
+
+# -----------------------------------------------------------------------------
+#  Terminal and shell
+# -----------------------------------------------------------------------------
+#  Konsole, already installed and kept deliberately rather than adding kitty.
+#  environment.conf sets TERMINAL=konsole and keybindings.conf binds
+#  SUPER+Return to it.
+konsole
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+starship
+fzf
+zoxide
+eza
+bat
+ripgrep
+fd
+yazi
+jq
+gum
+figlet
+neovim
+
+# -----------------------------------------------------------------------------
+#  Fonts
+# -----------------------------------------------------------------------------
+ttf-jetbrains-mono-nerd
+ttf-firacode-nerd
+ttf-dejavu-nerd
+noto-fonts
+#  noto-fonts-emoji supplies NotoColorEmoji.ttf (CBDT/CBLC color bitmaps).
+#  Installing it is NOT sufficient on this machine: three already-present
+#  fonts advertise emoji coverage and outranked it in fontconfig's
+#  coverage-sorted fallback, so emoji rendered monochrome.
+#    ~/.fonts/Segoe UI/seguisym.ttf  Segoe UI Symbol  -> monochrome
+#    ~/.fonts/Segoe UI/seguiemj.ttf  Segoe UI Emoji   -> color (COLR/CPAL)
+#    otf-font-awesome               Font Awesome 7    -> monochrome icons
+#  configs/.config/fontconfig/conf.d/76-noto-color-emoji.conf strips the
+#  emoji ranges from all three at scan time so Noto wins. See that file.
+noto-fonts-emoji
+noto-fonts-cjk
+otf-font-awesome
+ttf-ms-fonts  # optional
+
+# -----------------------------------------------------------------------------
+#  Applications (KDE apps deliberately kept)
+# -----------------------------------------------------------------------------
+#  These are already installed and are KEPT rather than replaced with
+#  GTK/other equivalents. They survive the Plasma removal because none of
+#  them depend on plasma-desktop or kwin, only on KDE Frameworks.
+#
+#  Deliberately NOT kept (removed in 70-remove-plasma.sh):
+#    kate              VS Code is the editor of choice
+#    kvantum           qt6ct-kde handles Qt theming
+#    kwalletmanager    gnome-keyring/libsecret is used instead
+#    kdialog           nothing in this setup calls it
+#    polkit-kde-agent  Noctalia v5 has a built-in polkit agent
+dolphin
+dolphin-plugins
+ffmpegthumbs
+ark
+okular
+gwenview
+spectacle
+kdeconnect
+qimgv
+mpv
+mpv-mpris
+
+# -----------------------------------------------------------------------------
+#  System utilities
+# -----------------------------------------------------------------------------
+pacman-contrib
+reflector
+rsync
+unzip
+unrar
+#  p7zip was renamed to '7zip' in the Arch repos.
+7zip
+man-pages
+bash-completion
+fastfetch
+btop
+solaar
+ntfs-3g
+cifs-utils
+fuse2

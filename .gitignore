@@ -1,0 +1,56 @@
+# =============================================================================
+#  MangoSetup .gitignore
+# =============================================================================
+#  This repo is deployed via SYMLINKS (scripts/20-symlink.sh): every file
+#  under configs/ is symlinked into its real $HOME location, so the repo and
+#  the live config are the same inodes. That makes it easy for runtime state,
+#  caches and timestamped backups to appear inside configs/ by accident.
+#  Everything below keeps that noise out of git.
+# =============================================================================
+
+# --- Timestamped backups made by the scripts themselves ---------------------
+#  20-symlink.sh and 40-root-symlink.sh back up (never delete) any real file
+#  they would overwrite, and this session's manual edits do the same.
+#  These belong on disk, not in history.
+.backups/
+*.bak
+*.bak-*
+*.pre-mangosetup-*
+*.orig
+*.rej
+
+# --- Wizard / script run state ----------------------------------------------
+#  setup.sh's STATE_DIR logs and per-step markers.
+.state/
+*.log
+
+# --- Files Noctalia GENERATES into config dirs -------------------------------
+#  These are written by Noctalia's builtin theme templates
+#  ([theme.templates].builtin_ids in configs/.config/noctalia/config.toml),
+#  derived live from the current wallpaper/palette. They are OUTPUT, not
+#  source, and they change on every wallpaper/theme switch.
+configs/.config/mango/noctalia.conf
+configs/.config/qt5ct/colors/noctalia.conf
+configs/.config/qt6ct/colors/noctalia.conf
+configs/.config/gtk-3.0/noctalia.css
+configs/.config/gtk-4.0/noctalia.css
+
+# --- Noctalia runtime state --------------------------------------------------
+#  Noctalia writes its own mutable settings/state next to the user config.
+configs/.config/noctalia/settings.toml
+configs/.config/noctalia/state/
+configs/.config/noctalia/cache/
+
+# --- Caches that can land under a symlinked config dir ----------------------
+configs/.config/fontconfig/cache/
+**/__pycache__/
+*.pyc
+
+# --- Editor / OS noise ------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

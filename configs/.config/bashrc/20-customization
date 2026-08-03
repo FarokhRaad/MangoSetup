@@ -1,0 +1,8 @@
+# -----------------------------------------------------
+# CUSTOMIZATION
+# -----------------------------------------------------
+#  Prompt is starship (same tool zsh uses), not oh-my-posh; matches
+#  ~/.config/zshrc/20-customization. starship supports both shells from the
+#  same ~/.config/starship.toml, so switching between bash and zsh keeps an
+#  identical prompt.
+eval "$(starship init bash)"
