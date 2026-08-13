@@ -284,6 +284,11 @@ ttf-ms-fonts  # optional
 # -----------------------------------------------------------------------------
 #  System utilities
 # -----------------------------------------------------------------------------
+#  ethtool: required by the optional "Disable Realtek EEE" system tweak
+#  (scripts/30-system-tweaks.sh). Without it that tweak is reported as n/a
+#  and its dispatcher script exits quietly, so a missing ethtool would make
+#  the fix silently do nothing.
+ethtool
 pacman-contrib
 reflector
 rsync

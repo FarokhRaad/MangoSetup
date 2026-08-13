@@ -282,8 +282,12 @@ fi
 # =============================================================================
 #  STEP 5: system tweaks
 # =============================================================================
-section "Step 5 / 7 - System tweaks (idle, mkinitcpio dupe fix, etc.)"
-if gum confirm --default "Apply/verify system tweaks now?"; then
+section "Step 5 / 7 - System tweaks (optional, pick what you want)"
+gum style --faint "Each tweak is opt-in and independent: a multi-select picker
+shows what's applicable to THIS hardware, what's already applied, and what
+doesn't apply. Nothing is applied unless you tick it. Reversible with
+./30-system-tweaks.sh --revert"
+if gum confirm --default "Open the system tweaks picker now?"; then
   "$SCRIPT_DIR/30-system-tweaks.sh"
 else
   info "skipped; run later with: ./30-system-tweaks.sh"

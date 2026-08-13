@@ -7,8 +7,8 @@ Configuration and setup scripts for [mango](https://github.com/mangowm/mango)
 
 This repo is designed to be reusable on a **clean/fresh Arch install**, not
 just on the machine it was first written for. A one-time, host-specific
-action — such as uninstalling whatever desktop environment happened to be on
-the machine beforehand — deliberately lives *outside* this repo, in
+action (such as uninstalling whatever desktop environment happened to be on
+the machine beforehand) deliberately lives *outside* this repo, in
 `../one-time-migration/`, so nothing here assumes anything about what was
 installed before.
 
@@ -47,11 +47,18 @@ scripts/
   00-preflight.sh      read-only system survey; run this first
   10-packages.sh       installs only what's missing (repo + AUR)
   20-symlink.sh        deploys configs/ into $HOME as symlinks
-  30-system-tweaks.sh  fixes known issues, otherwise a no-op if already tuned
+  30-system-tweaks.sh  interactive picker: choose which system tweaks to apply
   40-root-symlink.sh   (sudo) links theming dirs into /root for root GUI apps
   60-session.sh        switches SDDM -> greetd + the DMS greeter (reversible)
   swap-app.sh          change a default app (terminal/browser/...) in one line
   validate-config.sh   lints the mango config against a real mango source tree
+system/
+  sysctl/              vm.dirty_* writeback smoothing for CIFS/SMB copies
+  nm-dispatcher/       disable Realtek EEE (NIC auto-detected by driver)
+  udev/                Logitech Bolt: don't wake from suspend
+  modprobe/            keep the HDA audio codec powered
+                       ^ payloads for 30-system-tweaks.sh's optional tweaks,
+                         kept as real reviewable files rather than heredocs
 ```
 
 ## Design principles
@@ -120,7 +127,7 @@ what each step would do without installing/symlinking/tweaking anything.
 ./scripts/00-preflight.sh          # survey the system, no changes made
 ./scripts/10-packages.sh           # install mango + DankMaterialShell + deps
 ./scripts/20-symlink.sh            # deploy configs/ as symlinks
-./scripts/30-system-tweaks.sh      # fix known issues, skip what's already tuned
+./scripts/30-system-tweaks.sh      # pick which optional system tweaks to apply
 sudo ./scripts/40-root-symlink.sh  # make root's GUI apps match your theme
 ./scripts/validate-config.sh ~/.config/mango   # sanity-check before logging in
 ```
@@ -150,6 +157,56 @@ this repo: it is a one-time action tied to one host's history, not something
 a reusable setup should do. That kind of step lives in
 `../one-time-migration/` (e.g. `70-remove-plasma.sh`); see its own header for
 the reasoning.
+
+## System tweaks
+
+`scripts/30-system-tweaks.sh` is an **opt-in picker**, not a batch of changes
+applied on your behalf. It detects the state of each tweak, shows what is
+applicable to the hardware it is running on, and applies only what you tick:
+
+```bash
+./scripts/30-system-tweaks.sh              # multi-select picker
+./scripts/30-system-tweaks.sh --status     # show every tweak's state, change nothing
+./scripts/30-system-tweaks.sh --revert     # picker to undo applied tweaks
+./scripts/30-system-tweaks.sh --all --dry-run   # what an unattended run would do
+```
+
+Each tweak reports one of three states, so a fresh install and a
+half-configured machine both produce sensible output:
+
+| State | Meaning |
+|---|---|
+| `applied` | already in place, not offered again |
+| `available` | applicable here, not yet applied |
+| `n/a here` | the hardware/condition it targets is absent; cannot be selected |
+
+The payloads live in `system/` as ordinary files you can read before running
+anything, rather than heredocs inside the script:
+
+- **CIFS/SMB writeback smoothing** (`system/sysctl/`): caps dirty page cache to
+  absolute bytes so copies to network shares stream steadily instead of
+  burst-then-stall. The kernel's defaults are a *percentage of RAM*, so on a
+  32GB machine several GB of writes buffer at RAM speed and then stall hard
+  while draining. Harmless with no shares: 48MB is far below any SSD's write
+  speed, so it never becomes the limiting factor locally.
+- **Disable Realtek EEE** (`system/nm-dispatcher/`): Energy Efficient Ethernet
+  on r8169-family NICs renegotiates the link, causing TCP retransmit storms
+  that tank SMB throughput. The interface name is **auto-detected by driver**,
+  not hardcoded: predictable names are PCI-path-derived (`enp92s0`), so a
+  hardcoded script silently never fires on different hardware. Needs `ethtool`
+  (in `packages.txt` for exactly this reason). A pre-existing host-specific
+  `99-disable-eee-<iface>` script is detected and parked as `.superseded-by-*`
+  rather than left to fight over the same interface.
+- **Logitech Bolt wake** (`system/udev/`): stops the Bolt receiver
+  (`046d:c548`) waking the machine on mouse movement. Only offered when that
+  receiver is actually present.
+- **HDA audio autosuspend** (`system/modprobe/`): keeps the Intel HDA codec
+  powered so it does not click/pop and clip the start of notification sounds.
+- **pacman.conf niceties**: `Color`, `VerbosePkgLists`, `ParallelDownloads=10`,
+  backing up `pacman.conf` first.
+- **mkinitcpio duplicate-module repair**: rebuilds a `MODULES=` line that
+  repeated `sed` edits duplicated (a duplicated `nvidia_drm` breaks the
+  initramfs). Only offered when the duplication is actually detected.
 
 ## Choosing apps interactively
 
@@ -204,7 +261,7 @@ reach is anything outside mango's own config, since only mango expands them:
   `$TERMINAL`.
 - **DMS's own settings** live in `~/.config/DankMaterialShell/settings.json`.
   That file is per-machine runtime state written by the shell, so it is
-  gitignored and is **not** edited in this repo — change it through the
+  gitignored and is **not** edited in this repo; change it through the
   Settings UI instead:
 
   ```bash
@@ -219,19 +276,19 @@ reach is anything outside mango's own config, since only mango expands them:
 - **mango** 0.16.0+ (`github.com/mangowm/mango`, AUR package `mangowm`,
   binary `mango`)
 - **DankMaterialShell** (`github.com/AvengeMedia/DankMaterialShell`, docs at
-  <https://danklinux.com/docs/>) — a Quickshell (QML) + Go shell. This repo
+  <https://danklinux.com/docs/>): a Quickshell (QML) + Go shell. This repo
   installs `dms-shell-git` from the AUR; `dms-shell` in the official
   `[extra]` repo is the stable equivalent and is a drop-in swap in
   `packages/packages.txt`.
 
 Hard dependencies worth knowing about:
 
-- `quickshell` — in `[extra]`, DMS's only hard UI dependency.
-- `dgop` — DMS's system-metrics backend, a hard dependency. It is now in the
+- `quickshell`: in `[extra]`, DMS's only hard UI dependency.
+- `dgop`: DMS's system-metrics backend, a hard dependency. It is now in the
   official `[extra]` repo, so no AUR package is needed. (Historically the AUR
   `dgop-git` failed to build: its PKGBUILD built `./cmd/cli`, a path upstream
   renamed to `cmd/dgop`.)
-- `accountsservice` — hard dependency of `dms-shell`.
+- `accountsservice`: hard dependency of `dms-shell`.
 
 Why DMS specifically: it has genuine first-class mango support, not a generic
 fallback. It ships a `MangoService` that speaks mango's native

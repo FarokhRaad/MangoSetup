@@ -1,0 +1,47 @@
+#!/bin/bash
+# Disable Energy Efficient Ethernet (EEE) on Realtek r8169/r8168 NICs.
+#
+# WHY: EEE on these controllers periodically renegotiates the link. dmesg shows
+# recurring "r8169 ... Link is Down / Link is Up" cycles, which trigger TCP
+# retransmit storms and tank SMB/CIFS throughput under sustained load. The
+# symptom reads as "randomly slow network" or transfers stalling mid-copy.
+#
+# WHY A DISPATCHER SCRIPT: ethtool settings do NOT survive a reboot, a resume,
+# or a link down/up cycle. The PHY resets EEE back to enabled, so the setting
+# has to be reapplied every time the interface comes up.
+#
+# INTERFACE NAME IS NOT HARDCODED. Predictable interface names are derived from
+# PCI path (e.g. enp92s0), so a different board or slot produces a different
+# name and a hardcoded script would silently never fire. This resolves the
+# driver of whatever interface NetworkManager reports and acts only when it is
+# a Realtek r8169-family controller, which is the hardware the bug belongs to.
+# Disabling EEE on an unaffected NIC is pointless churn (and toggling EEE
+# itself forces one brief link renegotiation).
+#
+# Install: /etc/NetworkManager/dispatcher.d/99-disable-eee-realtek
+#          root:root, chmod 755 (NetworkManager ignores non-root-owned or
+#          non-executable dispatcher scripts)
+#
+# Test without waiting for a real event:
+#   sudo /etc/NetworkManager/dispatcher.d/99-disable-eee-realtek <iface> up
+#   ethtool --show-eee <iface>     # -> "EEE status: disabled"
+
+IFACE="$1"
+ACTION="$2"
+
+[ "$ACTION" = "up" ] || exit 0
+[ -n "$IFACE" ] || exit 0
+
+# Resolve the kernel driver bound to this interface.
+driver_link="/sys/class/net/${IFACE}/device/driver"
+[ -e "$driver_link" ] || exit 0
+driver=$(basename "$(readlink -f "$driver_link")")
+
+case "$driver" in
+    r8169|r8168|r8125|r8126)
+        command -v ethtool >/dev/null 2>&1 || exit 0
+        ethtool --set-eee "$IFACE" eee off >/dev/null 2>&1
+        ;;
+esac
+
+exit 0
