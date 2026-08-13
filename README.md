@@ -49,7 +49,9 @@ scripts/
   20-symlink.sh        deploys configs/ into $HOME as symlinks
   30-system-tweaks.sh  interactive picker: choose which system tweaks to apply
   40-root-symlink.sh   (sudo) links theming dirs into /root for root GUI apps
+  50-fstab.sh          data disk + network shares in /etc/fstab (credential-safe)
   60-session.sh        switches SDDM -> greetd + the DMS greeter (reversible)
+  nvidia-setup.sh      verify, and complete, an NVIDIA driver install
   swap-app.sh          change a default app (terminal/browser/...) in one line
   validate-config.sh   lints the mango config against a real mango source tree
 system/
