@@ -172,9 +172,9 @@ xwayland-satellite  # optional
 #  Theming
 # -----------------------------------------------------------------------------
 #  Qt theming. The -kde variants are patched to work correctly alongside the
-#  KDE platform theme, which matters here because we keep Dolphin, Okular,
-#  Gwenview, Ark and Konsole. environment.conf sets
-#  QT_QPA_PLATFORMTHEME=qt6ct.
+#  KDE platform theme, which matters if you install any KDE Frameworks-based
+#  apps via the picker (Dolphin, Okular, Gwenview, Ark, ...). environment.conf
+#  sets QT_QPA_PLATFORMTHEME=qt6ct.
 #  NOTE: these are AUR packages and CONFLICT with plain qt5ct/qt6ct.
 qt6ct-kde
 qt5ct-kde
@@ -194,9 +194,9 @@ archlinux-xdg-menu
 # -----------------------------------------------------------------------------
 #  Terminal and shell
 # -----------------------------------------------------------------------------
-#  Konsole, already installed and kept deliberately rather than adding kitty.
-#  environment.conf sets TERMINAL=konsole and keybindings.conf binds
-#  SUPER+Return to it.
+#  Baseline terminal package. TERMINAL's active default and any additional
+#  terminals are managed by conf/apps.conf and the setup.sh app picker; see
+#  that file's header and scripts/swap-app.sh to change it.
 konsole
 zsh
 zsh-autosuggestions
@@ -222,43 +222,25 @@ ttf-firacode-nerd
 ttf-dejavu-nerd
 noto-fonts
 #  noto-fonts-emoji supplies NotoColorEmoji.ttf (CBDT/CBLC color bitmaps).
-#  Installing it is NOT sufficient on this machine: three already-present
-#  fonts advertise emoji coverage and outranked it in fontconfig's
-#  coverage-sorted fallback, so emoji rendered monochrome.
-#    ~/.fonts/Segoe UI/seguisym.ttf  Segoe UI Symbol  -> monochrome
-#    ~/.fonts/Segoe UI/seguiemj.ttf  Segoe UI Emoji   -> color (COLR/CPAL)
-#    otf-font-awesome               Font Awesome 7    -> monochrome icons
+#  Installing it is NOT sufficient by itself: other fonts that also claim
+#  emoji code points (e.g. otf-font-awesome, or any Segoe UI Symbol/Emoji
+#  files dropped into ~/.fonts) can outrank it in fontconfig's
+#  coverage-sorted fallback, rendering emoji monochrome instead of color.
 #  configs/.config/fontconfig/conf.d/76-noto-color-emoji.conf strips the
-#  emoji ranges from all three at scan time so Noto wins. See that file.
+#  emoji ranges from known offenders at scan time so Noto wins regardless
+#  of what else is installed. See that file.
 noto-fonts-emoji
 noto-fonts-cjk
 otf-font-awesome
 ttf-ms-fonts  # optional
 
-# -----------------------------------------------------------------------------
-#  Applications (KDE apps deliberately kept)
-# -----------------------------------------------------------------------------
-#  These are already installed and are KEPT rather than replaced with
-#  GTK/other equivalents. They survive the Plasma removal because none of
-#  them depend on plasma-desktop or kwin, only on KDE Frameworks.
-#
-#  Deliberately NOT kept (removed in 70-remove-plasma.sh):
-#    kate              VS Code is the editor of choice
-#    kvantum           qt6ct-kde handles Qt theming
-#    kwalletmanager    gnome-keyring/libsecret is used instead
-#    kdialog           nothing in this setup calls it
-#    polkit-kde-agent  DMS ships its own polkit agent
-dolphin
-dolphin-plugins
-ffmpegthumbs
-ark
-okular
-gwenview
-spectacle
-kdeconnect
-qimgv
-mpv
-mpv-mpris
+#  Applications for file manager, image viewer, document viewer, archive
+#  manager, and media player roles are NOT listed here. They are installed
+#  via scripts/setup.sh's interactive picker (packages/app-catalog.txt),
+#  which lets you choose per-role at install time and writes the active
+#  default into configs/.config/mango/conf/apps.conf. Run the picker, or
+#  install your preferred apps manually and set the matching env=ROLE line
+#  yourself (see apps.conf's header and scripts/swap-app.sh).
 
 # -----------------------------------------------------------------------------
 #  System utilities
