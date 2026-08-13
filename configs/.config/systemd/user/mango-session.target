@@ -20,8 +20,8 @@
 #  WAYLAND_DISPLAY and friends are already visible to the user manager.
 #
 #  Source: danklinux.com/docs/dankmaterialshell/installation, section
-#  "Compositor-Specific Systemd Setup -> MangoWC".
-Description=MangoWC Session Target
+#  "Compositor-Specific Systemd Setup -> MangoWM".
+Description=MangoWM Session Target
 Requires=graphical-session.target
 After=graphical-session.target
 BindsTo=graphical-session.target

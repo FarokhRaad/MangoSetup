@@ -391,6 +391,14 @@ ffmpegthumbs             # optional
 #  is what makes this look broken.
 spm-arch
 
+#  ffmpegthumbs: video thumbnails in Dolphin. Needed explicitly because it is
+#  NOT a dolphin dependency, unlike the other 15 thumbnailers named in
+#  configs/.config/dolphinrc, which all ship in kio-extras and arrive with
+#  dolphin automatically (verified with `pacman -F` against
+#  /usr/lib/qt6/plugins/kf6/thumbcreator/). Without this, video files show a
+#  generic icon and the dolphinrc entry silently does nothing.
+ffmpegthumbs
+
 #  ethtool: required by the optional "Disable Realtek EEE" system tweak
 #  (scripts/30-system-tweaks.sh). Without it that tweak is reported as n/a
 #  and its dispatcher script exits quietly, so a missing ethtool would make

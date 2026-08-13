@@ -5,12 +5,25 @@ Configuration and setup scripts for [mango](https://github.com/mangowm/mango)
 [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell)
 ([docs](https://danklinux.com/docs/)) as the shell, on Arch Linux.
 
-This repo is designed to be reusable on a **clean/fresh Arch install**, not
-just on the machine it was first written for. A one-time, host-specific
-action (such as uninstalling whatever desktop environment happened to be on
-the machine beforehand) deliberately lives *outside* this repo, in
-`../one-time-migration/`, so nothing here assumes anything about what was
-installed before.
+> ### Read this first
+>
+> **This is a personal setup, not a distribution.** It is written for one
+> person's hardware, monitors, network shares and taste, and it is published
+> mainly so the choices are documented somewhere.
+>
+> There is **no guarantee it works for anyone else**, and it is not plug and
+> play. Expect to edit things before running any of it. At minimum you will
+> want to look at:
+>
+> - `packages/packages.txt` and `packages/app-catalog.txt` for the applications
+> - `configs/.config/mango/conf/monitors.conf` for outputs, resolutions and
+>   which display is primary
+> - `system/fstab/shares.conf` for network shares (contains a LAN address)
+> - `scripts/30-system-tweaks.sh` for hardware-specific tweaks
+>
+> Some parts assume an NVIDIA GPU, a Btrfs root, a Logitech Bolt mouse, and
+> Persian font support. None of that is detected for you. Read a script before
+> running it, and use it at your own discretion.
 
 ## What's here
 
@@ -153,12 +166,6 @@ display manager or removing a previous desktop environment:
 ./scripts/60-session.sh            # switch SDDM -> greetd + the DMS greeter
                                     # (reversible: ./scripts/60-session.sh --revert)
 ```
-
-Uninstalling a previously installed desktop environment is **not** part of
-this repo: it is a one-time action tied to one host's history, not something
-a reusable setup should do. That kind of step lives in
-`../one-time-migration/` (e.g. `70-remove-plasma.sh`); see its own header for
-the reasoning.
 
 ## System tweaks
 
