@@ -77,15 +77,32 @@ GPU_LINE=$(lspci -nn 2>/dev/null | grep -Ei 'vga|3d|display' | grep -i nvidia)
 if [[ -n "$GPU_LINE" ]]; then
   ok "NVIDIA GPU: $GPU_LINE"
   fact HAS_NVIDIA 1
-  if pacman -Qi nvidia-open-dkms &>/dev/null; then
-    ok "nvidia-open-dkms already installed, driver stack NOT being reinstalled"
-    fact NVIDIA_DRIVER nvidia-open-dkms
-  elif pacman -Qi nvidia-dkms &>/dev/null; then
-    ok "nvidia-dkms (proprietary) already installed"
-    fact NVIDIA_DRIVER nvidia-dkms
+  #  Detect ANY of the driver module packages, not just the dkms ones. Arch no
+  #  longer ships the proprietary `nvidia` package (only nvidia-open,
+  #  nvidia-open-dkms and nvidia-open-lts exist), and checking only for
+  #  *-dkms produced a false "no driver found" on a perfectly good
+  #  nvidia-open install.
+  NVIDIA_PKG=""
+  for _p in nvidia-open nvidia-open-dkms nvidia-open-lts nvidia-dkms nvidia nvidia-lts; do
+    if pacman -Qi "$_p" &>/dev/null; then NVIDIA_PKG="$_p"; break; fi
+  done
+  if [[ -n "$NVIDIA_PKG" ]]; then
+    ok "driver module package installed: $NVIDIA_PKG"
+    fact NVIDIA_DRIVER "$NVIDIA_PKG"
   else
-    warn "NVIDIA GPU present but no driver package found installed"
+    err "NVIDIA GPU present but NO driver package is installed"
+    err "-> the desktop will not start. Fix with:  ./nvidia-setup.sh install"
     fact NVIDIA_DRIVER none
+  fi
+
+  #  The kernel module alone is not enough: without nvidia-utils there is no
+  #  libGL/EGL/Vulkan ICD and the compositor cannot start.
+  if pacman -Qi nvidia-utils &>/dev/null; then
+    ok "userspace libraries installed: nvidia-utils"
+  else
+    err "nvidia-utils is NOT installed (no libGL/EGL/Vulkan; desktop will fail)"
+    err "-> fix with:  ./nvidia-setup.sh install"
+    fact NVIDIA_UTILS none
   fi
 
   #  A sed-based MODULES= edit that runs more than once can append the nvidia

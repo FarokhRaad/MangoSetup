@@ -68,6 +68,9 @@ mkdir -p "$STATE_DIR"
 #  failed and nothing was actually installed.
 # -----------------------------------------------------------------------------
 FAILED_STEPS=()
+#  Set when a step lands something that only takes effect after a reboot
+#  (kernel modules, initramfs). Surfaced in the final summary.
+NEEDS_REBOOT=false
 step_run() {
   local label="$1"; shift
   local script="$1"; shift
@@ -89,7 +92,7 @@ step_run() {
 #  or partial clone is caught up front instead of three steps in.
 missing_scripts=()
 for s in 00-preflight.sh 10-packages.sh 20-symlink.sh 30-system-tweaks.sh \
-         40-root-symlink.sh validate-config.sh; do
+         40-root-symlink.sh validate-config.sh nvidia-setup.sh; do
   [[ -f "$SCRIPT_DIR/$s" ]] || missing_scripts+=("$s")
 done
 if ((${#missing_scripts[@]})); then
@@ -415,6 +418,36 @@ if ((${#CATEGORY_DEFAULT[@]})) && [[ -f "$APPS_CONF" ]]; then
 fi
 
 # =============================================================================
+#  STEP 2b: NVIDIA driver completion
+#
+#  The driver is normally installed by archinstall, because it must be present
+#  before the first boot into a graphical session. This catches the case where
+#  that did not happen and offers to complete it, rather than letting you
+#  discover it as a black screen after ./60-session.sh.
+#
+#  Runs BEFORE the main package install so a reboot-requiring fix surfaces
+#  early rather than at the very end of the wizard.
+# =============================================================================
+if [[ -f "$SCRIPT_DIR/nvidia-setup.sh" ]]; then
+  if bash "$SCRIPT_DIR/nvidia-setup.sh" check >"$STATE_DIR/nvidia.log" 2>&1; then
+    :   # complete, or no NVIDIA GPU: stay quiet
+  else
+    section "NVIDIA driver"
+    gum pager <"$STATE_DIR/nvidia.log" 2>/dev/null || cat "$STATE_DIR/nvidia.log"
+    warn "the NVIDIA driver stack is incomplete (details above)"
+    if $DRY_RUN; then
+      info "[DRY] would offer to run: nvidia-setup.sh install"
+    elif gum confirm --default "Install the missing NVIDIA pieces now?"; then
+      step_run "nvidia driver" "$SCRIPT_DIR/nvidia-setup.sh" install || true
+      NEEDS_REBOOT=true
+    else
+      warn "skipped. The desktop may not start until you run:"
+      warn "  ./nvidia-setup.sh install"
+    fi
+  fi
+fi
+
+# =============================================================================
 #  STEP 3: package installation
 # =============================================================================
 section "Step 3 / 7 - Install packages"
@@ -553,6 +586,10 @@ idempotent, so re-running is safe). Do NOT switch your display manager with
 fi
 
 banner "Setup pass complete"
+if $NEEDS_REBOOT; then
+  warn "REBOOT REQUIRED before starting a graphical session:"
+  warn "kernel modules and/or the initramfs were changed this run."
+fi
 gum style --faint "Next: log into a mango session (from your display manager, or
 run 'mango' from a TTY) and verify the DankMaterialShell bar, launcher
 (SUPER+space) and keybinds work before running ./60-session.sh to switch
