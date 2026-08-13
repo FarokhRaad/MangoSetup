@@ -25,13 +25,21 @@
 # -----------------------------------------------------------------------------
 #  Compositor
 # -----------------------------------------------------------------------------
-#  AUR name verified 2026-07-30 via the AUR RPC:
-#    mangowm      0.15.5-1.1   tagged release   <- used here
-#    mangowm-git  1b6e01d7-1.7 latest main
-#  Requires wlroots 0.20 and scenefx 0.5 (up from 0.19/0.4 in older builds).
+#  AUR name verified 2026-08-13 via the AUR RPC:
+#    mangowm      0.16.0-1     tagged release   <- used here
+#    mangowm-git  latest main
+#  Requires wlroots 0.20 and scenefx 0.5. 'mangowm' also provides the old
+#  'mangowc' name, so nothing needs the pre-rename package.
+#  NOTE: 0.16.0 REMOVED the `ov_no_resize` config key that 0.15.5 had. Run
+#  scripts/validate-config.sh after any mango upgrade to catch keys the
+#  installed parser no longer recognises.
 mangowm
 
-#  IPC/config tooling and output management.
+#  wlr-randr: a small standalone CLI for listing/poking outputs. NOT a DMS
+#  dependency (DMS has native output handling: `dms randr` and its `outputs`
+#  IPC target). Kept because monitors.conf and rules-tags.conf tell you to
+#  run `wlr-randr` to discover connector names before writing monitorrule=
+#  lines, which is genuinely the easiest way to do that from a TTY.
 wlr-randr
 
 # -----------------------------------------------------------------------------
@@ -56,10 +64,12 @@ dms-shell-git
 quickshell
 
 #  dgop is DMS's system-metrics backend (CPU/mem/disk/net), a hard dependency.
-#  IMPORTANT: use dgop-bin, NOT dgop-git. The git PKGBUILD builds ./cmd/cli,
-#  which upstream renamed to cmd/dgop, so dgop-git fails with
-#  "stat .../cmd/cli: directory not found".
-dgop-bin
+#  It is now in the official [extra] repo, so no AUR package is needed.
+#  (Historical note: the old AUR 'dgop-git' failed to build because its
+#  PKGBUILD built ./cmd/cli, a path upstream renamed to cmd/dgop. Both the
+#  bare 'dgop' AUR package and that workaround are obsolete now that
+#  extra/dgop exists.)
+dgop
 
 #  accountsservice: hard dependency of dms-shell (user avatar / account info).
 accountsservice
@@ -67,43 +77,43 @@ accountsservice
 # -----------------------------------------------------------------------------
 #  Shell runtime dependencies
 # -----------------------------------------------------------------------------
-#  Wallpaper-driven color scheme generation.
+#  Verified against the DMS source tree (not just its PKGBUILD, which omits
+#  runtime tools, and not just the docs, which lag). DMS implements a
+#  surprising amount natively in Go, so the usual Wayland utility belt is
+#  NOT needed here. Anything removed below is documented at the end of this
+#  section so it does not get re-added by reflex.
+
+#  Wallpaper-driven colour scheme generation. `dms doctor` flags this as an
+#  IMPORTANT optional dependency (commands_doctor.go marks it important:true),
+#  so a missing matugen degrades theming rather than failing loudly.
 matugen
 
-#  wl-clipboard provides wl-copy/wl-paste for scripts and CLI use.
-#  NOTE: cliphist is NOT needed. DMS implements clipboard history itself
-#  (IPC target `clipboard`: open/close/toggle, bound to SUPER+v in DMS's own
-#  binds fragment), so running cliphist too means two processes racing to own
-#  the same Wayland selection. Only add it if you want an external picker.
-wl-clipboard
+#  Audio visualiser backend. Also marked important:true by `dms doctor`.
+cava
 
-#  Screenshots: DMS has a built-in screenshot service (`dms screenshot`,
-#  bound to the Print keys in its binds fragment), so grim/slurp are not
-#  required for those. Kept because they are tiny and many scripts and other
-#  tools still expect them.
-grim
-slurp
-#  Colour picker. DMS has one too (IPC target `color-picker`), but hyprpicker
-#  is kept as the external CLI alternative used by SUPER+SHIFT+C.
-hyprpicker
+#  System sound feedback (upstream optdepend / Fedora spec Recommends).
+qt6-multimedia
 
-#  Brightness: brightnessctl drives the laptop panel (eDP-1) via sysfs.
-#
-#  ddcutil drives EXTERNAL monitors over I2C/DDC, but on THIS machine
-#  DDC/CI does not work (verified 2026-08-03, ddcutil 2.2.7):
-#    DP-2     (BenQ GW2381) -> "DDC communication failed", every attempt,
-#                              including --sleep-multiplier 5.
-#    HDMI-A-1 (BenQ GW2381) -> detected in ~4 of 5 passes, reads sometimes
-#                              return brightness, but every setvcp WRITE
-#                              failed (DDCRC_RETRIES / DDCRC_READ_ALL_ZERO).
-#  Kept installed anyway: it is the only way to retry after enabling the
-#  DDC/CI option in each BenQ's OSD menu (ships disabled on many units).
-#  DMS reads brightness backends itself; ddcutil stays installed so external
-#  monitor control starts working the moment DDC/CI is enabled in the OSD.
-#  Retest with: ddcutil detect && ddcutil -d 1 setvcp 10 80
-ddcutil
-brightnessctl
-i2c-tools
+#  Extra image formats for the image viewer and wallpaper picker. `dms doctor`
+#  probes for the individual plugin .so files, so both are worth having:
+#    qt6-imageformats -> WebP, TIFF, GIF, JP2, ICNS
+#    kimageformats    -> AVIF, HEIF, JXL, EXR
+qt6-imageformats
+kimageformats
+
+#  Printer management in the control center (upstream Suggests).
+cups-pk-helper
+
+#  Filesystem search engine behind DMS's search UI. AUR name is 'dsearch-bin'
+#  (provides/conflicts 'dsearch'); the binary is `dsearch`, which is what
+#  `dms doctor` looks for. There is no plain 'danksearch' AUR package.
+dsearch-bin
+
+#  Calendar app DMS's calendar widgets integrate with natively. AUR name is
+#  'dankcalendar-bin', binary `dcal`.
+#  TRAP: the AUR package literally named 'dcal' is an UNRELATED "generic
+#  calendar for X" (libx11). Do not use it.
+dankcalendar-bin
 
 #  Audio (PipeWire stack). DMS talks to WirePlumber for volume and per-app
 #  streams (IPC target `audio`).
@@ -112,28 +122,53 @@ pipewire-pulse
 pipewire-alsa
 wireplumber
 
-#  MPRIS media control.
-playerctl
-
-#  Calculator backend for the launcher's calculator mode.
-libqalculate
-
 #  Network and bluetooth backends for the control center.
 networkmanager
 bluez
 bluez-utils
 
-#  Power profile switching.
+#  Power profile switching (DMS checks the DBus name, not a binary).
 power-profiles-daemon
 
-#  Notification library.
+#  Notification library. DMS's own notification daemon is native, but it
+#  shells out to `notify-send` for a few of its own alerts (battery warnings,
+#  portal errors, the notification test button), so keep libnotify.
 libnotify
 
-#  System tray support.
-libayatana-appindicator
-
-#  GPU/system monitoring for the resource widgets.
-lm_sensors
+# -----------------------------------------------------------------------------
+#  Deliberately NOT installed: DMS implements these natively
+# -----------------------------------------------------------------------------
+#  Each line below was checked by grepping the DMS source, not inferred.
+#  Re-verify with a source grep before adding any of them back.
+#
+#    brightnessctl   ZERO references in the DMS tree. Brightness is native:
+#                    core/internal/server/brightness/{sysfs,logind}.go
+#    ddcutil         ZERO spawns. DMS speaks DDC/CI over i2c ioctl itself in
+#    i2c-tools       core/internal/server/brightness/ddc.go + ddc_filter.go
+#                    (a Go reimplementation of ddcutil's probing logic).
+#                    `dms doctor` reports I2C/DDC by probing directly.
+#    grim, slurp     ZERO references. Screenshots are native
+#                    (core/cmd/dms/commands_screenshot.go, `dms screenshot`).
+#    hyprpicker      ZERO references. `dms color pick -a` is the native screen
+#                    eyedropper (keybindings.conf uses it); the in-shell modal
+#                    is `dms ipc call color-picker toggle`.
+#    wl-clipboard    Clipboard history is native; DMS even ships
+#    cliphist        `dms cliphist-migrate` to import AWAY from cliphist.
+#                    Running an external watcher races for the Wayland
+#                    selection. Only add wl-clipboard if YOUR OWN scripts
+#                    need wl-copy/wl-paste.
+#    libqalculate    No qalc/Qalculate reference anywhere in DMS.
+#    playerctl       MPRIS is Quickshell.Services.Mpris (MprisController.qml),
+#                    not the playerctl CLI.
+#    lm_sensors      No `sensors` invocation; telemetry comes from dgop.
+#    libayatana-     Tray is Quickshell.Services.SystemTray (StatusNotifier),
+#      appindicator  not libappindicator.
+#
+#  Optional external integrations DMS *will* use if present, not installed
+#  here because they are personal choices:
+#    swappy   screenshot annotation editor
+#    khal     CLI calendar source (dankcalendar covers this better)
+#    fprintd  fingerprint auth
 
 # -----------------------------------------------------------------------------
 #  Session / login
@@ -171,24 +206,28 @@ xwayland-satellite  # optional
 # -----------------------------------------------------------------------------
 #  Theming
 # -----------------------------------------------------------------------------
-#  Qt theming. The -kde variants are patched to work correctly alongside the
-#  KDE platform theme, which matters if you install any KDE Frameworks-based
-#  apps via the picker (Dolphin, Okular, Gwenview, Ark, ...). environment.conf
-#  sets QT_QPA_PLATFORMTHEME=qt6ct.
-#  NOTE: these are AUR packages and CONFLICT with plain qt5ct/qt6ct.
-qt6ct-kde
-qt5ct-kde
-#  Kvantum is intentionally NOT included; qt6ct-kde handles Qt theming.
+#  Qt theming. Plain qt6ct/qt5ct from [extra] are used, NOT the AUR
+#  'qt6ct-kde'/'qt5ct-kde' forks: upstream DMS names plain `qt6ct` in its own
+#  optdepends and Fedora spec (Suggests: qt6ct), extra/qt6ct is the same
+#  version as the AUR fork (0.11), and qt5ct-kde is stale (1.8 vs extra's
+#  1.9). The -kde variants also conflict with the plain ones, so listing the
+#  AUR names only adds a build step and a conflict to resolve.
+#  environment.conf sets QT_QPA_PLATFORMTHEME=qt6ct.
+qt6ct
+qt5ct
+#  Kvantum is intentionally NOT included; qt6ct handles Qt theming.
 #  GTK theme that matches Adwaita/libadwaita apps.
 adw-gtk-theme
 #  GTK theme/cursor/icon picker.
 nwg-look
-#  Cursor and icon theme (breeze_cursors is referenced in appearance.conf).
+#  Cursor and icon theme (breeze_cursors is referenced in appearance.conf
+#  and environment.conf's XCURSOR_THEME; change both if you drop this).
 breeze
 breeze-gtk
-#  Qt/KDE integration for Qt apps like Dolphin.
+#  kde-cli-tools + archlinux-xdg-menu are only useful if you install Qt/KDE
+#  apps from the picker (Dolphin's "Open With" menu needs
+#  XDG_MENU_PREFIX=arch-). Harmless but droppable on a pure GTK selection.
 kde-cli-tools
-#  Populates Dolphin's "Open With" menu (needs XDG_MENU_PREFIX=arch-).
 archlinux-xdg-menu
 
 # -----------------------------------------------------------------------------
