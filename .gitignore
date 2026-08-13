@@ -8,6 +8,17 @@
 #  Everything below keeps that noise out of git.
 # =============================================================================
 
+# --- Local-only notes (NEVER commit) ----------------------------------------
+#  NOTES.local.md and anything else matching *.local.* is working documentation
+#  for this machine: LAN addresses, disk UUIDs, monitor names, credentials
+#  discussion, and the reasoning behind decisions. The public README is the
+#  sanitised version. Keep this pattern ABOVE any negated rules so nothing can
+#  re-include it by accident.
+NOTES.local.md
+*.local.md
+*.local.conf
+.notes/
+
 # --- Timestamped backups made by the scripts themselves ---------------------
 #  20-symlink.sh and 40-root-symlink.sh back up (never delete) any real file
 #  they would overwrite, and this session's manual edits do the same.
