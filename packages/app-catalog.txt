@@ -32,13 +32,20 @@
 # --- Shell ($SHELL) -----------------------------------------------------------
 #  bash is already installed on every Arch system (it is in `base`), so it is
 #  listed purely so the picker can show it and so choosing it is explicit.
-#  Selecting zsh ALSO pulls its companion packages (autosuggestions, syntax
-#  highlighting); those are deliberately absent from packages.txt so a
-#  bash-only machine does not carry them. See setup.sh's shell-companions step.
-#  The repo ships configs for both (.bashrc + .config/bashrc/, .zshrc +
-#  .config/zshrc/), so either choice lands in a configured shell.
+#  The repo ships configs for bash and zsh (.bashrc + .config/bashrc/,
+#  .zshrc + .config/zshrc/), so either lands in a configured shell.
+#
+#  COMPANION PACKAGES: a 6th pipe-separated field, space-separated, installed
+#  ONLY when that row is selected. This is why zsh-autosuggestions and
+#  zsh-syntax-highlighting are absent from packages.txt: a bash-only machine
+#  should not carry them. setup.sh reads field 6 generically, so any future
+#  row can use it.
+#    role|package|binary|source|label|companions
+#
+#  Picking a shell here also offers to run `chsh`, since exporting SHELL does
+#  not change the login shell recorded in /etc/passwd.
 SHELL|bash|bash|repo|bash (already present on Arch)
-SHELL|zsh|zsh|repo|zsh (+ autosuggestions & syntax highlighting)
+SHELL|zsh|zsh|repo|zsh (+ autosuggestions & syntax highlighting)|zsh-autosuggestions zsh-syntax-highlighting
 SHELL|fish|fish|repo|fish (no repo config shipped - you configure it)
 
 # --- Terminal -----------------------------------------------------------------

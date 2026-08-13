@@ -281,7 +281,11 @@ for role in "${CATEGORIES[@]}"; do
   DISPLAY=()
   PRESELECT=()
   for row in "${ROWS[@]}"; do
-    IFS='|' read -r _ pkg bin _ label <<<"$row"
+    #  6th field = optional space-separated companion packages, installed only
+    #  when this row is selected. Must be read explicitly: `read` assigns the
+    #  remainder of the line to the last variable, so omitting `companions`
+    #  would silently append "|zsh-autosuggestions ..." to `label`.
+    IFS='|' read -r _ pkg bin _ label companions <<<"$row"
     #  Provides-aware: `pacman -Qi` only matches an exact package name, so it
     #  misses packages satisfied via provides (dgop-bin provides dgop) and
     #  group names. `pacman -T` is the provides-aware test.
@@ -325,7 +329,11 @@ for role in "${CATEGORIES[@]}"; do
   CHOSEN_BINS=()
   for disp in "${CHOSEN[@]}"; do
     row="${LABEL_TO_ROW[$disp]}"
-    IFS='|' read -r _ pkg bin _ label <<<"$row"
+    #  6th field = optional space-separated companion packages, installed only
+    #  when this row is selected. Must be read explicitly: `read` assigns the
+    #  remainder of the line to the last variable, so omitting `companions`
+    #  would silently append "|zsh-autosuggestions ..." to `label`.
+    IFS='|' read -r _ pkg bin _ label companions <<<"$row"
     #  Only queue packages that are NOT already satisfied.
     #
     #  This is NOT what prevents reinstalls: every install call already passes
@@ -343,6 +351,13 @@ for role in "${CATEGORIES[@]}"; do
     else
       echo "$pkg" >> "$SELECTIONS_FILE"
     fi
+    #  Companion packages ride along with the row that declares them, and are
+    #  queued independently of the main package: zsh can already be installed
+    #  while its plugins are not.
+    for comp in $companions; do
+      pacman -Qi "$comp" &>/dev/null || pacman -T "$comp" &>/dev/null \
+        || echo "$comp" >> "$SELECTIONS_FILE"
+    done
     #  Still a valid default candidate either way: being already installed does
     #  not disqualify an app from being the active default.
     CHOSEN_BINS+=("$bin|$label")
@@ -407,6 +422,41 @@ if gum confirm --default "Install mango + DankMaterialShell + your chosen apps n
   extra_flag=()
   $DRY_RUN && extra_flag+=(--dry-run)
   EXTRA_PKG_FILE="$SELECTIONS_FILE" step_run "packages" "$SCRIPT_DIR/10-packages.sh" "${extra_flag[@]}"
+
+  # ---------------------------------------------------------------------------
+  #  Login shell. Deliberately AFTER the install: chsh refuses a shell that is
+  #  not yet on disk and listed in /etc/shells, so this cannot run earlier.
+  #
+  #  Exporting SHELL from apps.conf does NOT change the login shell; that lives
+  #  in /etc/passwd. Offered rather than forced, because chsh needs the user's
+  #  password and changing someone's login shell without asking is rude.
+  # ---------------------------------------------------------------------------
+  want_shell="${CATEGORY_DEFAULT[SHELL]:-}"
+  if [[ -n "$want_shell" ]]; then
+    shell_path="$(command -v "$want_shell" 2>/dev/null || true)"
+    current_shell="$(getent passwd "$USER" | cut -d: -f7)"
+    if [[ -z "$shell_path" ]]; then
+      warn "$want_shell is not on PATH yet; skipping the login-shell change"
+      warn "run it yourself once installed:  chsh -s \$(command -v $want_shell)"
+    elif [[ "$current_shell" == "$shell_path" ]]; then
+      ok "login shell is already $shell_path"
+    elif ! grep -qxF "$shell_path" /etc/shells; then
+      #  chsh rejects anything absent from /etc/shells for a non-root user.
+      warn "$shell_path is not listed in /etc/shells; not changing the login shell"
+      warn "add it as root, then:  chsh -s $shell_path"
+    elif $DRY_RUN; then
+      info "[DRY] would offer: chsh -s $shell_path"
+    elif gum confirm --default "Make $want_shell your login shell? (asks for your password)"; then
+      if chsh -s "$shell_path"; then
+        ok "login shell set to $shell_path (takes effect at your NEXT login)"
+      else
+        warn "chsh failed; your login shell is unchanged ($current_shell)"
+        warn "retry manually:  chsh -s $shell_path"
+      fi
+    else
+      info "login shell left as $current_shell"
+    fi
+  fi
 else
   info "skipped; run later with: EXTRA_PKG_FILE=$SELECTIONS_FILE ./10-packages.sh"
 fi

@@ -57,7 +57,11 @@ else
   exit 1
 fi
 
-VALID_ROLES=(TERMINAL BROWSER FILEMANAGER EDITOR VISUAL GUI_EDITOR MESSENGER \
+#  Kept in sync with the env=ROLE, lines in apps.conf and the roles in
+#  packages/app-catalog.txt. setup.sh's catalog sanity gate enforces that every
+#  catalog role has an apps.conf entry; this list is the third place a role
+#  name appears, so add new roles here too.
+VALID_ROLES=(SHELL TERMINAL BROWSER FILEMANAGER EDITOR VISUAL GUI_EDITOR MESSENGER \
              IMAGEVIEWER DOCVIEWER MEDIAPLAYER ARCHIVEMANAGER)
 
 list_roles() {
@@ -155,6 +159,26 @@ if [[ -f "$RULES_FILE" ]] && [[ "$ROLE" == "MESSENGER" ]]; then
   warn "It still references the OLD app; check and update that rule if the"
   warn "new app's appid differs:"
   grep -n 'appid.*ferdium\|MESSENGER' "$RULES_FILE" 2>/dev/null | sed 's/^/    /'
+fi
+
+if [[ "$ROLE" == "SHELL" ]]; then
+  #  env=SHELL is declarative only. The LOGIN shell lives in /etc/passwd, so
+  #  updating apps.conf alone leaves the two disagreeing.
+  shell_path="$(command -v "$COMMAND" 2>/dev/null || true)"
+  current_login="$(getent passwd "$USER" | cut -d: -f7)"
+  if [[ -n "$shell_path" && "$current_login" == "$shell_path" ]]; then
+    ok "login shell already matches ($shell_path)"
+  else
+    warn "this only updated apps.conf. Your LOGIN shell is still ${current_login}."
+    if [[ -z "$shell_path" ]]; then
+      warn "install $COMMAND first, then:  chsh -s \$(command -v $COMMAND)"
+    elif ! grep -qxF "$shell_path" /etc/shells; then
+      warn "$shell_path is missing from /etc/shells; add it as root, then:"
+      warn "  chsh -s $shell_path"
+    else
+      warn "to change it for real:  chsh -s $shell_path   (effective next login)"
+    fi
+  fi
 fi
 
 if command -v mango &>/dev/null && pgrep -x mango &>/dev/null; then
