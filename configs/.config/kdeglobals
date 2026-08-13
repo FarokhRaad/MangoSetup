@@ -1,0 +1,40 @@
+# KDE global settings, for the KDE apps used outside a Plasma session
+# =============================================================================
+#  Dolphin, Ark, Okular, Gwenview and friends read this file even with no
+#  Plasma session running. Without it they fall back to defaults that are wrong
+#  for a mango setup: a terminal that may not be installed, and the Breeze
+#  widget style instead of the qt6ct one this repo configures.
+#
+#  Deployed to ~/.config/kdeglobals by scripts/20-symlink.sh, and symlinked
+#  into /root by scripts/40-root-symlink.sh so root-run KDE apps match.
+
+[General]
+#  Which terminal Dolphin opens for "Open Terminal" (F4) and "Open Terminal
+#  Here". Dolphin has no sane default here: if this is unset or names a
+#  missing binary, F4 silently does nothing, which is a confusing failure.
+#
+#  KEEP THIS IN SYNC with env=TERMINAL in conf/apps.conf. Changing your
+#  terminal through the setup picker or scripts/swap-app.sh updates apps.conf,
+#  and this line has to be changed by hand to match.
+TerminalApplication=kitty
+
+[Icons]
+#  Breeze is pulled in by the breeze package and is what the qt6ct theme in
+#  this repo expects. matugen recolours the app palette, not the icon set.
+Theme=breeze
+
+[KDE]
+#  Route Qt widget styling through qt6ct, which is what makes KDE apps follow
+#  the matugen-generated colours instead of ignoring them.
+#  configs/.config/qt6ct/ carries the matching qt6ct.conf and colour scheme.
+widgetStyle=qt6ct-style
+
+[PreviewSettings]
+#  Do NOT generate thumbnails for files on remote (SMB/CIFS, SFTP) mounts.
+#  This repo mounts network shares via /etc/fstab (scripts/50-fstab.sh), and
+#  thumbnailing a remote directory pulls every file over the network, which
+#  makes Dolphin hang on large shares.
+EnableRemoteFolderThumbnail=false
+#  Upper size limit for a remote file to be thumbnailed at all, in bytes.
+#  Only consulted when the above is enabled; kept as a second safety net.
+MaximumRemoteSize=10485760000

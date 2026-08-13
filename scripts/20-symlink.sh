@@ -198,6 +198,34 @@ case "$MODE" in
         warn "fc-cache failed; new fonts may not appear until you run: fc-cache -f"
       fi
     fi
+    #  Bind DMS to the mango session target. This is what actually makes the
+    #  `exec-once=systemctl --user start mango-session.target` line in
+    #  autostart.conf launch the shell.
+    #
+    #  add-wants is used rather than `systemctl --user enable dms` on purpose:
+    #  enable would start DMS in EVERY user session (including a TTY login or
+    #  another desktop), whereas a want on mango-session.target starts it only
+    #  when mango starts.
+    #
+    #  dms.service comes from the DMS package at /usr/lib/systemd/user/. If it
+    #  is not installed yet, skip with a clear message rather than failing: the
+    #  package install step may not have run, and this is safe to re-run later.
+    if [[ -f "$HOME/.config/systemd/user/mango-session.target" ]] \
+       && command -v systemctl >/dev/null 2>&1; then
+      if systemctl --user cat dms.service >/dev/null 2>&1; then
+        #  Idempotent: repeated add-wants just re-creates the same symlink.
+        if systemctl --user add-wants mango-session.target dms.service >/dev/null 2>&1; then
+          ok "dms bound to mango-session.target"
+        else
+          warn "could not bind dms to mango-session.target; run manually:"
+          warn "  systemctl --user add-wants mango-session.target dms.service"
+        fi
+      else
+        info "dms.service not found yet (install DMS first), so the session"
+        info "target was left unwired. Re-run this script after installing, or:"
+        info "  systemctl --user add-wants mango-session.target dms.service"
+      fi
+    fi
     ((CONFLICTS)) && warn "existing files backed up: $CONFLICTS (see *.pre-mangosetup-* alongside each)" || true
     info "From now on, editing a file at either its ~/.config path or its"
     info "configs/ path in this repo edits the SAME file. Use 'git status'"

@@ -1,5 +1,5 @@
 "$schema" = 'https://starship.rs/config-schema.json'
-palette = "mangosetup"
+palette = "kanagawa"
 
 format = """
 [](color_bg1)\
@@ -60,28 +60,15 @@ disabled = false
 style = "bg:color_bg1 fg:color_fg"
 
 [os.symbols]
+#  Only the systems actually in use are listed. Starship falls back to its own
+#  built-in symbol for anything not named here, so trimming this list loses
+#  nothing.
+#  The TRAILING SPACE inside each string is deliberate: these are Nerd Font
+#  glyphs, and without the space the glyph renders clipped against the text
+#  that follows it. Do not "tidy" it away.
 Windows = "󰍲 "
-Ubuntu = "󰕈"
-SUSE = ""
-Raspbian = "󰐿"
-Mint = "󰣭"
-Macos = "󰀵"
-Manjaro = ""
-Linux = "󰌽"
-Gentoo = "󰣨"
-Fedora = "󰣛"
-Alpine = ""
-Amazon = ""
-Android = ""
-AOSC = ""
-Arch = "󰣇"
-Artix = "󰣇"
-EndeavourOS = ""
-CentOS = ""
-Debian = "󰣚"
-Redhat = "󱄛"
-RedHatEnterprise = "󱄛"
-Pop = ""
+Arch = "󰣇 "
+Ubuntu = "󰕈 "
 
 [username]
 show_always = false

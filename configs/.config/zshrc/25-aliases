@@ -55,6 +55,13 @@ alias mango-validate='~/MangoSetup/scripts/validate-config.sh ~/.config/mango'
 # -----------------------------------------------------
 # SPM: force fzf preview shell to bash
 # -----------------------------------------------------
-
-# Run SPM with bash as fzf preview shell
+#  /usr/bin/spm (package spm-arch) is a #!/bin/bash script that drives fzf, and
+#  fzf runs its --bind / --preview strings through $SHELL rather than through
+#  bash. Under a zsh login shell those strings are handed to zsh, but they use
+#  bash test syntax such as [[ $w =~ ^[0-9]+$ ]] in the alt-[ / alt-] preview
+#  width bindings, so the bindings misbehave.
+#
+#  Overriding SHELL for this one command only is the minimal fix: it does not
+#  change your login shell, and it does not affect anything else spm calls.
+#  Only needed for zsh, which is why there is no equivalent in the bash config.
 alias spm='SHELL=/bin/bash /usr/bin/spm'

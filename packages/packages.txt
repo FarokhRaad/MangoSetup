@@ -351,6 +351,46 @@ limine-mkinitcpio-hook   # optional
 #  configs/.config/mango/conf/autostart.conf.
 motrix-next-bin
 
+#  krename: bulk/batch file renamer. Added for Dolphin: it ships two KIO
+#  servicemenus (krename_all_nonrec.desktop, krename_dir_rec.desktop) into
+#  /usr/share/kio/servicemenus/, so "Rename with KRename" appears in Dolphin's
+#  right-click menu with no configuration. kbuildsycoca6 in autostart.conf is
+#  what refreshes that menu cache.
+#
+#  Note it is still a Qt5/KF5 application (5.0.2, depends on kio5/qt5-base) in
+#  an otherwise Qt6 desktop, so it pulls in the KF5 libraries. Worth knowing if
+#  you are trying to keep Qt5 off the system; drop this line if so.
+#
+#  Marked optional because it is only useful with a KIO file manager: the
+#  servicemenus do nothing without Dolphin, and Dolphin comes from the
+#  interactive picker rather than this file. Install with --with-optional.
+krename                  # optional
+
+#  ffmpegthumbs: video thumbnails in Dolphin. Needed explicitly because it is
+#  NOT a dolphin dependency, unlike the other 15 thumbnailers named in
+#  configs/.config/dolphinrc, which all ship in kio-extras and arrive with
+#  dolphin automatically (verified with `pacman -F` against
+#  /usr/lib/qt6/plugins/kf6/thumbcreator/). Without this line videos fall back
+#  to a generic icon and the `ffmpegthumbs` entry in dolphinrc does nothing.
+#  Optional for the same reason as krename: pointless without a KIO file
+#  manager, and Dolphin is a picker choice, not a guaranteed install.
+ffmpegthumbs             # optional
+
+#  spm-arch: "Simple Package Manager", an fzf TUI over pacman/yay. NOT an AUR
+#  helper itself, it depends on yay and shells out to it (10-packages.sh is what
+#  actually bootstraps yay). Ships /usr/bin/spm, a spm_updates.timer that
+#  refreshes the package cache, and a libalpm hook.
+#
+#  IMPORTANT, and the reason this is not just another package line: /usr/bin/spm
+#  is a #!/bin/bash script that drives fzf, and fzf executes its --bind and
+#  --preview strings through $SHELL. Under a non-bash login shell those bindings
+#  (which use bash test syntax such as [[ $w =~ ^[0-9]+$ ]]) misbehave, so
+#  configs/.config/zshrc/25-aliases ships:
+#      alias spm='SHELL=/bin/bash /usr/bin/spm'
+#  Keep the package and that alias together: installing one without the other
+#  is what makes this look broken.
+spm-arch
+
 #  ethtool: required by the optional "Disable Realtek EEE" system tweak
 #  (scripts/30-system-tweaks.sh). Without it that tweak is reported as n/a
 #  and its dispatcher script exits quietly, so a missing ethtool would make

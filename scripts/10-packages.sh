@@ -13,8 +13,9 @@
 #  Usage:
 #    ./10-packages.sh [--dry-run] [--with-optional]
 #
-#  --with-optional installs lines in packages.txt marked "# optional"
-#  (currently: xwayland-satellite, ttf-ms-fonts).
+#  --with-optional installs lines in packages.txt marked "# optional".
+#  The list is NOT repeated here on purpose: it went stale once already.
+#  To see it:  grep '# optional' packages/packages.txt
 #
 #  EXTRA_PKG_FILE=<path> (environment variable, not a flag): merge in an
 #  additional newline-separated package list on top of packages.txt. Used
