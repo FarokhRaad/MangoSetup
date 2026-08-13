@@ -343,6 +343,14 @@ limine-mkinitcpio-hook   # optional
 # -----------------------------------------------------------------------------
 #  System utilities
 # -----------------------------------------------------------------------------
+#  Download manager, autostarted minimised to the tray by autostart.conf.
+#  motrix-next is the maintained Tauri rewrite of Motrix (aria2 backend:
+#  HTTP/FTP/BitTorrent/magnet). Deliberately NOT in the interactive app picker
+#  because it is a fixed choice, so it installs unconditionally like the rest
+#  of this file. The tray flag it is launched with is documented in
+#  configs/.config/mango/conf/autostart.conf.
+motrix-next-bin
+
 #  ethtool: required by the optional "Disable Realtek EEE" system tweak
 #  (scripts/30-system-tweaks.sh). Without it that tweak is reported as n/a
 #  and its dispatcher script exits quietly, so a missing ethtool would make

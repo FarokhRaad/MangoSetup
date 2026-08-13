@@ -60,6 +60,10 @@ BROWSER|microsoft-edge-stable-bin|microsoft-edge-stable|aur|Microsoft Edge
 BROWSER|firefox|firefox|repo|Firefox
 BROWSER|chromium|chromium|repo|Chromium
 BROWSER|brave-bin|brave|aur|Brave
+#  Brave Origin: Brave's minimalist build, no rewards/wallet/VPN/AI sidebar.
+#  Separate package and separate binary (brave-origin), so it coexists with
+#  brave-bin rather than replacing it.
+BROWSER|brave-origin-bin|brave-origin|aur|Brave Origin (minimalist Brave)
 BROWSER|vivaldi|vivaldi|repo|Vivaldi
 BROWSER|zen-browser-bin|zen-browser|aur|Zen Browser
 BROWSER|floorp-bin|floorp|aur|Floorp
