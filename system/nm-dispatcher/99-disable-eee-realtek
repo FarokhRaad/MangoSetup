@@ -11,7 +11,7 @@
 # has to be reapplied every time the interface comes up.
 #
 # INTERFACE NAME IS NOT HARDCODED. Predictable interface names are derived from
-# PCI path (e.g. enp92s0), so a different board or slot produces a different
+# PCI path (e.g. enp<slot>s<n>), so a different board or slot produces a different
 # name and a hardcoded script would silently never fire. This resolves the
 # driver of whatever interface NetworkManager reports and acts only when it is
 # a Realtek r8169-family controller, which is the hardware the bug belongs to.

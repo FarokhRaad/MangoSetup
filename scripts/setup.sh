@@ -48,13 +48,109 @@ for arg in "$@"; do
 done
 
 GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; YELLOW=$'\033[1;33m'
-BLUE=$'\033[0;34m'; BOLD=$'\033[1m'; NC=$'\033[0m'
+BLUE=$'\033[0;34m'; NC=$'\033[0m'
 ok()   { printf '%s[ OK ]%s %s\n' "$GREEN" "$NC" "$*"; }
 err()  { printf '%s[FAIL]%s %s\n' "$RED" "$NC" "$*"; }
 warn() { printf '%s[WARN]%s %s\n' "$YELLOW" "$NC" "$*"; }
 info() { printf '%s[INFO]%s %s\n' "$BLUE" "$NC" "$*"; }
 
 mkdir -p "$STATE_DIR"
+
+# -----------------------------------------------------------------------------
+#  Sub-script runner.
+#
+#  Always invokes via `bash <script>` rather than executing the file directly:
+#  a clone onto a noexec mount (or one where the exec bit was lost) would
+#  otherwise fail with "Permission denied" for no obvious reason.
+#
+#  Also RECORDS FAILURES. Previously every step's exit status was discarded, so
+#  the wizard printed "Setup pass complete" even when package installation had
+#  failed and nothing was actually installed.
+# -----------------------------------------------------------------------------
+FAILED_STEPS=()
+step_run() {
+  local label="$1"; shift
+  local script="$1"; shift
+  if [[ ! -f "$script" ]]; then
+    err "$label: script not found: $script"
+    FAILED_STEPS+=("$label (missing script)")
+    return 1
+  fi
+  local rc=0
+  bash "$script" "$@" || rc=$?
+  if (( rc != 0 )); then
+    err "$label: FAILED (exit $rc)"
+    FAILED_STEPS+=("$label")
+  fi
+  return "$rc"
+}
+
+#  Verify the whole script set is present before asking any questions, so a bad
+#  or partial clone is caught up front instead of three steps in.
+missing_scripts=()
+for s in 00-preflight.sh 10-packages.sh 20-symlink.sh 30-system-tweaks.sh \
+         40-root-symlink.sh validate-config.sh; do
+  [[ -f "$SCRIPT_DIR/$s" ]] || missing_scripts+=("$s")
+done
+if ((${#missing_scripts[@]})); then
+  err "this repo checkout is incomplete; missing scripts: ${missing_scripts[*]}"
+  err "re-clone the repository and try again"
+  exit 1
+fi
+
+# -----------------------------------------------------------------------------
+#  Environment sanity, BEFORE anything interactive.
+#
+#  A fresh Arch install ("base" only) provides none of sudo, git, python or an
+#  AUR helper, and may have an unsynced pacman database. Catch all of that here
+#  with actionable instructions rather than failing three steps in.
+# -----------------------------------------------------------------------------
+if [[ $EUID -eq 0 ]]; then
+  err "do not run this wizard as root."
+  err "Package builds (makepkg) refuse to run as root, and configs would be"
+  err "deployed into /root instead of your user's home."
+  err "On a fresh install, create a user first:"
+  err "  useradd -m -G wheel yourname && passwd yourname"
+  err "  pacman -S --needed sudo && EDITOR=nano visudo   # uncomment %wheel line"
+  err "  su - yourname   then re-run this script"
+  exit 1
+fi
+
+if ! command -v pacman &>/dev/null; then
+  err "pacman not found: this script only supports Arch Linux and derivatives."
+  exit 1
+fi
+
+#  gum (and `read -rp`) need a real terminal. Piped/redirected stdin makes gum
+#  either error out or block forever, so refuse up front with a pointer to the
+#  manual path instead of hanging.
+if [[ ! -t 0 ]] || [[ ! -t 1 ]]; then
+  err "this wizard is interactive and needs a terminal (stdin/stdout is not a TTY)."
+  err "Run it directly in a terminal, or use the individual scripts instead:"
+  err "  bash ./10-packages.sh && bash ./20-symlink.sh"
+  exit 1
+fi
+
+missing_prereq=()
+command -v sudo    &>/dev/null || missing_prereq+=(sudo)
+command -v git     &>/dev/null || missing_prereq+=(git)
+command -v python3 &>/dev/null || missing_prereq+=(python)
+if ((${#missing_prereq[@]})); then
+  err "missing prerequisites: ${missing_prereq[*]}"
+  err "These are NOT included in Arch's 'base' metapackage. As root, run:"
+  err "  pacman -Syu --needed ${missing_prereq[*]} base-devel"
+  err "then re-run this script as your normal user."
+  exit 1
+fi
+
+#  An empty sync DB makes every `pacman -Si` fail, which would misclassify the
+#  entire manifest. 10-packages.sh also guards this, but catching it here avoids
+#  walking the user through the whole app picker first.
+if ! pacman -Si bash &>/dev/null; then
+  err "pacman's sync database is empty or unusable."
+  err "Sync it first:  sudo pacman -Sy"
+  exit 1
+fi
 
 # -----------------------------------------------------------------------------
 #  gum bootstrap: the wizard needs gum before 10-packages.sh has run.
@@ -64,8 +160,11 @@ if ! command -v gum &>/dev/null; then
   read -rp "Install it now from the official repos? [Y/n] " reply
   if [[ -z "$reply" || "$reply" == "y" || "$reply" == "Y" ]]; then
     sudo pacman -S --needed --noconfirm gum || { err "failed to install gum"; exit 1; }
+    command -v gum &>/dev/null || { err "gum still not on PATH after install"; exit 1; }
   else
-    err "gum is required for this wizard. Run ./10-packages.sh manually instead."
+    err "gum is required for this wizard."
+    err "Run the steps manually instead (see README.md), starting with:"
+    err "  bash ./10-packages.sh"
     exit 1
   fi
 fi
@@ -97,10 +196,17 @@ fi
 # =============================================================================
 section "Step 1 / 7 - System survey (read-only, no changes)"
 if gum confirm --default "Run 00-preflight.sh now?"; then
+  #  Invoked as `bash <script>` (not directly) so a noexec mount or a lost exec
+  #  bit cannot break it. Quoting via an argv array avoids re-quoting problems
+  #  when SCRIPT_DIR or STATE_DIR contain spaces.
   gum spin --spinner dot --title "Surveying system..." -- \
-    bash -c "'$SCRIPT_DIR/00-preflight.sh' > '$STATE_DIR/preflight.log' 2>&1" \
+    bash -c 'bash "$1" > "$2" 2>&1' _ "$SCRIPT_DIR/00-preflight.sh" "$STATE_DIR/preflight.log" \
     || warn "preflight reported issues, see $STATE_DIR/preflight.log"
-  gum pager < "$STATE_DIR/preflight.log" 2>/dev/null || cat "$STATE_DIR/preflight.log"
+  if [[ -s "$STATE_DIR/preflight.log" ]]; then
+    gum pager < "$STATE_DIR/preflight.log" 2>/dev/null || cat "$STATE_DIR/preflight.log"
+  else
+    warn "preflight produced no output"
+  fi
 else
   info "skipped"
 fi
@@ -174,7 +280,7 @@ for role in "${CATEGORIES[@]}"; do
   DISPLAY=()
   PRESELECT=()
   for row in "${ROWS[@]}"; do
-    IFS='|' read -r _ pkg bin src label <<<"$row"
+    IFS='|' read -r _ pkg bin _ label <<<"$row"
     disp="$label  [$pkg]"
     DISPLAY+=("$disp")
     LABEL_TO_ROW["$disp"]="$row"
@@ -206,7 +312,7 @@ for role in "${CATEGORIES[@]}"; do
   CHOSEN_BINS=()
   for disp in "${CHOSEN[@]}"; do
     row="${LABEL_TO_ROW[$disp]}"
-    IFS='|' read -r _ pkg bin src label <<<"$row"
+    IFS='|' read -r _ pkg bin _ label <<<"$row"
     echo "$pkg" >> "$SELECTIONS_FILE"
     CHOSEN_BINS+=("$bin|$label")
   done
@@ -264,7 +370,7 @@ section "Step 3 / 7 - Install packages"
 if gum confirm --default "Install mango + DankMaterialShell + your chosen apps now?"; then
   extra_flag=()
   $DRY_RUN && extra_flag+=(--dry-run)
-  EXTRA_PKG_FILE="$SELECTIONS_FILE" "$SCRIPT_DIR/10-packages.sh" "${extra_flag[@]}"
+  EXTRA_PKG_FILE="$SELECTIONS_FILE" step_run "packages" "$SCRIPT_DIR/10-packages.sh" "${extra_flag[@]}"
 else
   info "skipped; run later with: EXTRA_PKG_FILE=$SELECTIONS_FILE ./10-packages.sh"
 fi
@@ -274,7 +380,9 @@ fi
 # =============================================================================
 section "Step 4 / 7 - Deploy configs (symlink into \$HOME)"
 if gum confirm --default "Symlink configs/ into your home directory now?"; then
-  "$SCRIPT_DIR/20-symlink.sh"
+  symlink_flag=()
+  $DRY_RUN && symlink_flag+=(--dry-run)
+  step_run "config deploy" "$SCRIPT_DIR/20-symlink.sh" "${symlink_flag[@]}"
 else
   info "skipped; run later with: ./20-symlink.sh"
 fi
@@ -288,7 +396,9 @@ shows what's applicable to THIS hardware, what's already applied, and what
 doesn't apply. Nothing is applied unless you tick it. Reversible with
 ./30-system-tweaks.sh --revert"
 if gum confirm --default "Open the system tweaks picker now?"; then
-  "$SCRIPT_DIR/30-system-tweaks.sh"
+  tweak_flag=()
+  $DRY_RUN && tweak_flag+=(--dry-run)
+  step_run "system tweaks" "$SCRIPT_DIR/30-system-tweaks.sh" "${tweak_flag[@]}"
 else
   info "skipped; run later with: ./30-system-tweaks.sh"
 fi
@@ -297,10 +407,27 @@ fi
 #  STEP 6: root theming symlinks
 # =============================================================================
 section "Step 6 / 7 - Root theming symlinks (sudo)"
-gum style --faint "This makes root-run GUI apps (pkexec dialogs, sudo dolphin,
-polkit prompts) match your GTK/Qt theme, icons, and cursor."
+gum style --faint "This makes root-run GUI apps (pkexec dialogs, polkit prompts,
+a file manager launched with sudo) match your GTK/Qt theme, icons, and cursor."
 if gum confirm --default "Link theming into /root now? (asks for sudo)"; then
-  sudo "$SCRIPT_DIR/40-root-symlink.sh"
+  if $DRY_RUN; then
+    step_run "root theming" "$SCRIPT_DIR/40-root-symlink.sh" --dry-run || true
+  elif [[ $EUID -eq 0 ]]; then
+    step_run "root theming" "$SCRIPT_DIR/40-root-symlink.sh" || true
+  elif command -v sudo >/dev/null 2>&1; then
+    #  Run through sudo, still via bash so a noexec/mode issue cannot bite.
+    #  SUDO_USER is what the script uses to find whose configs to link, and
+    #  sudo sets it automatically.
+    rc=0
+    sudo bash "$SCRIPT_DIR/40-root-symlink.sh" || rc=$?
+    if (( rc != 0 )); then
+      err "root theming: FAILED (exit $rc)"
+      FAILED_STEPS+=("root theming")
+    fi
+  else
+    warn "sudo is not installed; skipping. Run as root later:"
+    warn "  bash ./40-root-symlink.sh"
+  fi
 else
   info "skipped; run later with: sudo ./40-root-symlink.sh"
 fi
@@ -309,16 +436,39 @@ fi
 #  STEP 7: validate
 # =============================================================================
 section "Step 7 / 7 - Validate the deployed mango config"
-if gum confirm --default "Run validate-config.sh against ~/.config/mango now?"; then
-  "$SCRIPT_DIR/validate-config.sh" "$HOME/.config/mango" 2>&1 | gum pager 2>/dev/null \
-    || "$SCRIPT_DIR/validate-config.sh" "$HOME/.config/mango"
+if [[ ! -d "$HOME/.config/mango" ]]; then
+  warn "\$HOME/.config/mango does not exist yet (step 4 skipped?); nothing to validate"
+elif ! command -v python3 >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+  warn "validate-config.sh needs python3 and git; skipping the check"
+  warn "install them and run: ./validate-config.sh ~/.config/mango"
+elif gum confirm --default "Run validate-config.sh against ~/.config/mango now?"; then
+  #  Capture once, then page. Piping straight into gum pager discarded the exit
+  #  status and re-ran the whole validation on pager failure.
+  vlog="$STATE_DIR/validate.log"
+  vrc=0
+  bash "$SCRIPT_DIR/validate-config.sh" "$HOME/.config/mango" >"$vlog" 2>&1 || vrc=$?
+  gum pager <"$vlog" 2>/dev/null || cat "$vlog"
+  if (( vrc != 0 )); then
+    err "config validation reported problems (exit $vrc); see $vlog"
+    FAILED_STEPS+=("config validation")
+  fi
 else
   info "skipped; run later with: ./validate-config.sh ~/.config/mango"
 fi
 
 echo
+if ((${#FAILED_STEPS[@]})); then
+  banner "Setup finished WITH ERRORS"
+  err "these steps failed: ${FAILED_STEPS[*]}"
+  gum style --faint "Fix the errors above and re-run ./setup.sh (every step is
+idempotent, so re-running is safe). Do NOT switch your display manager with
+./60-session.sh until a mango session is confirmed working."
+  exit 1
+fi
+
 banner "Setup pass complete"
 gum style --faint "Next: log into a mango session (from your display manager, or
 run 'mango' from a TTY) and verify the DankMaterialShell bar, launcher
 (SUPER+space) and keybinds work before running ./60-session.sh to switch
 the display manager to the DMS greeter."
+exit 0

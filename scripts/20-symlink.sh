@@ -156,11 +156,15 @@ for src in "${FILES[@]}"; do
 done
 
 step "Summary"
+#  NOTE: `((VAR)) && info ...` as the LAST statement of a case branch makes the
+#  script exit 1 whenever VAR is 0, because ((0)) returns false. That is the
+#  normal healthy state, so it reported failure on a perfectly good setup.
+#  Every such line now has an explicit `|| true` guard.
 case "$MODE" in
   status)
     ok "linked correctly : $LINKED"
-    ((CONFLICTS)) && warn "not linked / mismatched : $CONFLICTS"
-    ((MISSING_TARGET_DIR)) && info "not deployed yet : $MISSING_TARGET_DIR"
+    ((CONFLICTS)) && warn "not linked / mismatched : $CONFLICTS" || true
+    ((MISSING_TARGET_DIR)) && info "not deployed yet : $MISSING_TARGET_DIR" || true
     ;;
   dry-run)
     info "would link/relink : $LINKED"
@@ -175,9 +179,10 @@ case "$MODE" in
   link)
     ok "linked/relinked : $LINKED"
     ok "already correct : $ALREADY"
-    ((CONFLICTS)) && warn "existing files backed up: $CONFLICTS (see *.pre-mangosetup-* alongside each)"
+    ((CONFLICTS)) && warn "existing files backed up: $CONFLICTS (see *.pre-mangosetup-* alongside each)" || true
     info "From now on, editing a file at either its ~/.config path or its"
     info "configs/ path in this repo edits the SAME file. Use 'git status'"
     info "in the repo any time to see what changed while you were using mango."
     ;;
 esac
+exit 0

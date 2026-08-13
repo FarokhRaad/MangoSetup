@@ -159,18 +159,15 @@ else
   fact TWEAK_PACMAN_CONF 0
 fi
 
-step "fstab"
-#  This repo never generates or edits fstab. Network storage is host-specific,
-#  so if CIFS/SMB mounts are already present and working they are left
-#  untouched; if you need them, add them by hand. The check below looks for
-#  the hydra.lan share this config's file manager bookmarks expect, purely as
-#  an informational hint.
-if grep -q 'hydra.lan' /etc/fstab 2>/dev/null; then
-  ok "fstab declares hydra.lan CIFS mounts; left untouched"
-  fact FSTAB_OK 1
+step "Network mounts"
+#  This repo never generates or edits fstab: network storage is host-specific.
+#  Reported purely so you know whether the file manager's places will resolve.
+if grep -qE '^\s*//|\s+cifs\s|\s+nfs4?\s' /etc/fstab 2>/dev/null; then
+  ok "fstab declares network mount(s) (CIFS/NFS); left untouched"
+  fact FSTAB_NETWORK_MOUNTS 1
 else
-  info "fstab does not reference hydra.lan; add any network mounts you need manually"
-  fact FSTAB_OK 0
+  info "no network mounts in fstab; add any you need manually (never edited here)"
+  fact FSTAB_NETWORK_MOUNTS 0
 fi
 
 step "Display manager"

@@ -23,6 +23,23 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+#  Prerequisites (NOT in Arch's "base" metapackage)
+# -----------------------------------------------------------------------------
+#  Arch's `base` provides bash/coreutils/pacman/systemd/pciutils/iproute2 but
+#  NOT these. Every one is load-bearing for this setup, and the failure modes
+#  are silent, so they are listed explicitly and checked by the scripts:
+#    sudo        every script that touches the system uses it
+#    git         cloning the mango source for validate-config.sh; AUR builds
+#    python      validate-config.sh's parser-inventory checker
+#    base-devel  makepkg, required to build ANY AUR package (including yay)
+#  If these are missing the scripts refuse to run and tell you this exact
+#  command, rather than half-installing a desktop.
+sudo
+git
+python
+base-devel
+
+# -----------------------------------------------------------------------------
 #  Compositor
 # -----------------------------------------------------------------------------
 #  AUR name verified 2026-08-13 via the AUR RPC:

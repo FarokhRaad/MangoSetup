@@ -44,11 +44,14 @@ set -uo pipefail
 
 MODE="switch"
 REVERT_TO=""
+FORCE=false
 for arg in "$@"; do
   case "$arg" in
     --dry-run) MODE="dry-run" ;;
     --revert)  MODE="revert" ;;
     --revert-to=*) MODE="revert"; REVERT_TO="${arg#*=}" ;;
+    --force)   FORCE=true ;;
+    -h|--help) sed -n '2,42p' "${BASH_SOURCE[0]}"; exit 0 ;;
   esac
 done
 
@@ -99,6 +102,18 @@ if [[ "$MODE" == "revert" ]]; then
 fi
 
 step "Preconditions"
+#  This script can leave a machine with NO graphical login if it points greetd
+#  at something that cannot start, so every precondition below is fatal rather
+#  than a warning. Use --force to override the session-file check if you know
+#  what you are doing.
+if ! command -v mango &>/dev/null; then
+  err "the mango compositor is not installed."
+  err "Run 10-packages.sh first; switching the display manager before the"
+  err "compositor exists would leave you with no way to log in graphically."
+  exit 1
+fi
+ok "mango compositor present"
+
 if ! command -v dms-greeter &>/dev/null; then
   err "dms-greeter not found. Run 10-packages.sh first"
   err "(it installs the 'greetd-dms-greeter-bin' AUR package)."
@@ -185,15 +200,23 @@ for d in /usr/share/wayland-sessions /usr/local/share/wayland-sessions; do
   fi
 done
 if ! $found_session; then
-  warn "no mango.desktop found under wayland-sessions/"
-  warn "the mangowm package should install one; if missing, create"
-  warn "/usr/share/wayland-sessions/mango.desktop with Exec= pointing at the"
-  warn "mango binary, or the greeter will not offer a mango session."
+  err "no mango.desktop found under wayland-sessions/"
+  err "The greeter would start with no mango session to offer, so you could not"
+  err "log into the desktop. The mangowm package normally installs this file."
+  err "Either reinstall mangowm, or create"
+  err "  /usr/share/wayland-sessions/mango.desktop"
+  err "with Exec= pointing at the mango binary."
+  if $FORCE; then
+    warn "--force given: continuing anyway"
+  else
+    err "Refusing to switch the display manager. Re-run with --force to override."
+    exit 1
+  fi
 fi
 info "sessions the greeter will offer:"
-sessions=$(ls /usr/share/wayland-sessions/*.desktop \
-              /usr/local/share/wayland-sessions/*.desktop 2>/dev/null \
-           | xargs -r -n1 basename)
+#  find, not ls: session filenames come from arbitrary packages.
+sessions=$(find /usr/share/wayland-sessions /usr/local/share/wayland-sessions \
+                -maxdepth 1 -name '*.desktop' -printf '%f\n' 2>/dev/null | sort -u)
 if [[ -n "$sessions" ]]; then
   printf '%s\n' "$sessions" | sed 's/^/    /'
 else

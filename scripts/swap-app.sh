@@ -103,7 +103,15 @@ fi
 BIN="${COMMAND%% *}"
 if ! command -v "$BIN" &>/dev/null; then
   warn "'$BIN' is not on PATH / not installed."
-  read -rp "$(printf '%sInstall it now with pacman/yay?%s [y/N] ' "$BOLD" "$NC")" reply
+  #  Without a TTY we cannot prompt; proceed with the swap and warn, rather
+  #  than blocking or silently doing nothing. The role change is still valid,
+  #  the binding just will not work until the app is installed.
+  reply=n
+  if [[ -t 0 ]]; then
+    read -rp "$(printf '%sInstall it now with pacman/yay?%s [y/N] ' "$BOLD" "$NC")" reply
+  else
+    warn "(non-interactive: not installing; set the app up yourself)"
+  fi
   if [[ "$reply" == "y" || "$reply" == "Y" ]]; then
     if pacman -Si "$BIN" &>/dev/null; then
       sudo pacman -S --needed "$BIN"

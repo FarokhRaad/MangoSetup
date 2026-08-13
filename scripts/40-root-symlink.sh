@@ -46,17 +46,25 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-#  Resolve the invoking (non-root) user, same pattern the old symlink.sh
-#  used, so `sudo ./40-root-symlink.sh` links the right person's configs.
-TARGET_USER="${SUDO_USER:-}"
+#  Resolve the invoking (non-root) user so we link the right person's configs.
+#  sudo sets SUDO_USER automatically; when run from a plain root shell there is
+#  no way to guess, so accept it explicitly rather than failing outright.
+TARGET_USER="${TARGET_USER:-${SUDO_USER:-}}"
 if [[ -z "$TARGET_USER" ]]; then
-  err "could not determine the invoking user (\$SUDO_USER is empty)."
-  err "run this as: sudo ./40-root-symlink.sh   (not as a root login shell)"
+  err "could not determine which user's theme to link (\$SUDO_USER is empty)."
+  err "Either run it through sudo from your normal account:"
+  err "  sudo bash ./40-root-symlink.sh"
+  err "or name the user explicitly when running as root:"
+  err "  TARGET_USER=yourname bash ./40-root-symlink.sh"
   exit 1
 fi
-USER_HOME=$(eval echo "~$TARGET_USER")
-if [[ ! -d "$USER_HOME" ]]; then
-  err "resolved home directory does not exist: $USER_HOME"
+if ! id "$TARGET_USER" &>/dev/null; then
+  err "user '$TARGET_USER' does not exist"
+  exit 1
+fi
+USER_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+if [[ -z "$USER_HOME" || ! -d "$USER_HOME" ]]; then
+  err "home directory for '$TARGET_USER' not found: ${USER_HOME:-<empty>}"
   exit 1
 fi
 info "linking theming from $USER_HOME (user: $TARGET_USER) into /root"
@@ -158,7 +166,10 @@ case "$MODE" in
   link)
     ok "linked/relinked : $LINKED"
     ok "already correct : $ALREADY"
-    ((SKIPPED)) && info "skipped (source missing) : $SKIPPED"
-    info "Test with: sudo dolphin   (should match your GTK/Qt theme, icons, cursor)"
+    #  `((SKIPPED)) && info ...` would make this script exit 1 when SKIPPED is
+    #  0 if it were the last statement; guarded with || true regardless.
+    ((SKIPPED)) && info "skipped (source missing) : $SKIPPED" || true
+    info "Root-run GUI apps now use your GTK/Qt theme, icons and cursor."
     ;;
 esac
+exit 0

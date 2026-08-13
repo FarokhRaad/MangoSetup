@@ -34,6 +34,7 @@
 #                                       (combines with the others, e.g.
 #                                        --all --dry-run, --revert --dry-run)
 #    ./30-system-tweaks.sh --all        apply every applicable tweak, no prompt
+#                                       (combines with --revert to undo all)
 #                                       (for unattended installs; still skips
 #                                        anything already applied or n/a)
 #
@@ -47,18 +48,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SYS_DIR="$REPO_DIR/system"
 
-#  MODE (what to do) and DRY (whether to actually write) are INDEPENDENT, so
-#  combinations like `--all --dry-run` and `--revert --dry-run` work. Folding
-#  them into one variable made --dry-run silently fall through to the picker.
+#  MODE (what to do), DRY (whether to write) and ALL (skip the picker) are all
+#  INDEPENDENT, so --all --dry-run and --revert --all both work. Folding them
+#  into one variable was a real bug twice: --dry-run fell through to the picker,
+#  and --revert --all silently APPLIED instead of reverting.
 MODE="pick"
 DRY=false
+ALL=false
 for arg in "$@"; do
   case "$arg" in
     --status)  MODE="status" ;;
     --revert)  MODE="revert" ;;
-    --all)     MODE="all" ;;
+    --all)     ALL=true ;;
     --dry-run) DRY=true ;;
-    -h|--help) sed -n '2,45p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,47p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) printf 'unknown option: %s (try --help)\n' "$arg" >&2; exit 2 ;;
   esac
 done
 
@@ -72,6 +76,37 @@ step() { printf '\n%s=== %s ===%s\n' "$BOLD" "$*" "$NC"; }
 
 run() {
   if $DRY; then printf '%s[DRY]%s %s\n' "$YELLOW" "$NC" "$*"; else "$@"; fi
+}
+
+# -----------------------------------------------------------------------------
+#  Privilege handling. Everything applied here lives under /etc, so it needs
+#  root. Designed to run as a NORMAL user with sudo (matching the other
+#  scripts), but must also work when invoked directly as root on a fresh
+#  install where sudo may not even be installed yet.
+#
+#  Deliberately NOT enforced for --status/--dry-run/--help: those write nothing,
+#  so requiring root would make the read-only paths needlessly privileged.
+# -----------------------------------------------------------------------------
+if [[ $EUID -eq 0 ]]; then
+  #  Already root: make `sudo x` mean `x` so a missing sudo package is a non-issue.
+  sudo() { "$@"; }
+fi
+need_root_or_die() {
+  $DRY && return 0
+  [[ "$MODE" == "status" ]] && return 0
+  [[ $EUID -eq 0 ]] && return 0
+  if ! command -v sudo >/dev/null 2>&1; then
+    err "root is required to write under /etc, but sudo is not installed."
+    err "Either install it (as root: pacman -S sudo) or run this script as root."
+    exit 1
+  fi
+  #  Prime the sudo timestamp up front so the picker is not interrupted by a
+  #  password prompt in the middle of applying tweaks.
+  if ! sudo -n true 2>/dev/null; then
+    info "root access is needed to write under /etc"
+    sudo -v || { err "could not obtain sudo privileges"; exit 1; }
+  fi
+  return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -92,16 +127,24 @@ WB_SRC="$SYS_DIR/sysctl/99-cifs-writeback-smoothing.conf"
 WB_DST="/etc/sysctl.d/99-cifs-writeback-smoothing.conf"
 wb_applicable() { [[ -f "$WB_SRC" ]]; }
 wb_applied() {
-  #  Live values are what actually matter; the file alone could be present
-  #  without having been loaded (or overridden by a later-sorting file).
-  local db dbytes
-  db=$(sysctl -n vm.dirty_background_bytes 2>/dev/null || echo 0)
-  dbytes=$(sysctl -n vm.dirty_bytes 2>/dev/null || echo 0)
-  [[ -f "$WB_DST" && "$db" != "0" && "$dbytes" != "0" ]]
+  #  Primary evidence is the file: that is what this tweak installs and what
+  #  survives a reboot. The live values are checked only as a secondary signal
+  #  and deliberately do NOT gate the result, because /proc/sys may be
+  #  read-only (container) or the values may not be applied until next boot.
+  [[ -f "$WB_DST" ]]
 }
 wb_apply() {
   run sudo install -m 644 -o root -g root "$WB_SRC" "$WB_DST" || return 1
-  run sudo sysctl --system >/dev/null || return 1
+  #  Reload is best-effort and deliberately NOT fatal: `sysctl --system` reads
+  #  every file under /etc/sysctl.d, so an unrelated broken file elsewhere (or
+  #  a read-only /proc/sys in a container) makes it exit nonzero even though
+  #  OUR file installed correctly. The setting applies on next boot regardless.
+  if ! run sudo sysctl --system >/dev/null 2>&1; then
+    warn "config installed, but 'sysctl --system' reported an error"
+    warn "(often an unrelated file in /etc/sysctl.d). It applies on next boot;"
+    warn "check with: sysctl vm.dirty_bytes vm.dirty_background_bytes"
+  fi
+  return 0
 }
 wb_revert() {
   run sudo rm -f "$WB_DST"
@@ -150,12 +193,17 @@ eee_apply() {
     run sudo mv "$f" "${f}.superseded-by-99-disable-eee-realtek"
   done < <(eee_legacy_files)
   #  Apply immediately to already-up interfaces instead of waiting for a
-  #  link event, so the fix takes effect in this session too.
+  #  link event, so the fix takes effect in this session too. Best-effort:
+  #  failure here (no live NIC, no udev, container) does not undo the install.
   local i
   for i in $(realtek_ifaces); do
-    run sudo "$EEE_DST" "$i" up
-    info "applied to $i now (also runs automatically on every link up)"
+    if run sudo "$EEE_DST" "$i" up; then
+      info "applied to $i now (also runs automatically on every link up)"
+    else
+      warn "could not apply to $i right now; will run on the next link up"
+    fi
   done
+  return 0
 }
 eee_revert() {
   run sudo rm -f "$EEE_DST"
@@ -170,21 +218,35 @@ eee_revert() {
 #  --- Logitech Bolt wake ----------------------------------------------------
 LOGI_SRC="$SYS_DIR/udev/90-disable-logi-bolt-wake.rules"
 LOGI_DST="/etc/udev/rules.d/90-disable-logi-bolt-wake.rules"
+#  Detect the receiver from sysfs ONLY: /sys is always present, whereas lsusb
+#  comes from usbutils which is NOT in Arch's base install. An earlier version
+#  fell back to a loose `grep -l c548` across idProduct files, which returned
+#  success even with no matching device (grep -l over several files, plus a
+#  substring match), so the tweak was offered on hardware that does not have it.
+#  Match vendor AND product exactly, on the same device.
+logi_bolt_present() {
+  local d
+  for d in /sys/bus/usb/devices/*; do
+    [[ -r "$d/idVendor" && -r "$d/idProduct" ]] || continue
+    [[ "$(<"$d/idVendor")"  == "046d" ]] || continue
+    [[ "$(<"$d/idProduct")" == "c548" ]] || continue
+    return 0
+  done
+  return 1
+}
 logi_applicable() {
   [[ -f "$LOGI_SRC" ]] || return 1
-  #  Only offer it if a Logitech Bolt receiver (046d:c548) is actually present.
-  if command -v lsusb >/dev/null 2>&1; then
-    lsusb 2>/dev/null | grep -qi '046d:c548' && return 0
-    return 1
-  fi
-  grep -qs . /sys/bus/usb/devices/*/idProduct 2>/dev/null || return 1
-  grep -lis 'c548' /sys/bus/usb/devices/*/idProduct >/dev/null 2>&1
+  logi_bolt_present
 }
 logi_applied() { [[ -f "$LOGI_DST" ]]; }
 logi_apply() {
   run sudo install -m 644 -o root -g root "$LOGI_SRC" "$LOGI_DST" || return 1
-  run sudo udevadm control --reload-rules
-  run sudo udevadm trigger --subsystem-match=usb
+  #  Best-effort reload: udev may not be running (container/chroot). The rule
+  #  is on disk and takes effect on the next boot or device re-plug either way.
+  run sudo udevadm control --reload-rules >/dev/null 2>&1 \
+    || warn "rule installed, but udev reload failed; effective after reboot/re-plug"
+  run sudo udevadm trigger --subsystem-match=usb >/dev/null 2>&1 || true
+  return 0
 }
 logi_revert() {
   run sudo rm -f "$LOGI_DST"
@@ -298,6 +360,16 @@ print_status() {
 if [[ "$MODE" == "status" ]]; then
   step "System tweaks"
   print_status
+  #  Extra signal for the writeback tweak: the file being installed is not the
+  #  same as the values being live (they apply at boot, and /proc/sys can be
+  #  read-only in a container), so show both.
+  if wb_applied; then
+    live_db=$(sysctl -n vm.dirty_bytes 2>/dev/null || echo "?")
+    if [[ "$live_db" == "0" || "$live_db" == "?" ]]; then
+      warn "writeback config is installed but NOT active yet (vm.dirty_bytes=$live_db)"
+      warn "it takes effect on the next boot, or run: sudo sysctl --system"
+    fi
+  fi
   echo
   info "nothing was modified. Run without --status to choose tweaks to apply."
   exit 0
@@ -332,9 +404,22 @@ if ((${#CAND_LABELS[@]} == 0)); then
 fi
 
 SELECTED=()
-if [[ "$MODE" == "all" ]]; then
+#  Interactivity check. gum needs a real terminal: with stdin/stdout redirected
+#  (a pipe, a cron job, CI) it either errors out or BLOCKS FOREVER waiting on a
+#  TTY it will never get. Detect that up front and refuse with instructions
+#  instead of hanging.
+if ! $ALL && { [[ ! -t 0 ]] || [[ ! -t 1 ]]; }; then
+  err "this picker needs an interactive terminal (stdin/stdout are not a TTY)."
+  err "For unattended use, pass --all to apply every applicable tweak:"
+  err "  bash ./30-system-tweaks.sh --all"
+  err "Or inspect without changing anything:"
+  err "  bash ./30-system-tweaks.sh --status"
+  exit 1
+fi
+
+if $ALL; then
   SELECTED=("${!CAND_PFX[@]}")
-  info "--all: selecting ${#CAND_LABELS[@]} applicable tweak(s)"
+  info "--all: selecting all ${#CAND_LABELS[@]} candidate(s) for $([[ "$MODE" == revert ]] && echo REVERT || echo apply)"
 elif command -v gum >/dev/null 2>&1; then
   verb="apply"; [[ "$MODE" == "revert" ]] && verb="REVERT"
   #  Nothing is pre-selected: every tweak is a deliberate choice.
@@ -357,7 +442,8 @@ else
       IFS='|' read -r _ _ rpfx rdesc <<<"$row"
       [[ "$rpfx" == "${CAND_PFX[$i]}" ]] && printf '%s  %s%s\n' "$DIM" "$rdesc" "$NC"
     done
-    read -rp "$( [[ "$MODE" == revert ]] && echo Revert || echo Apply ) this? [y/N] " r
+    r=n
+    read -rp "$( [[ "$MODE" == revert ]] && echo Revert || echo Apply ) this? [y/N] " r || r=n
     [[ "$r" == y || "$r" == Y ]] && SELECTED+=("$i")
   done
 fi
@@ -366,6 +452,10 @@ if ((${#SELECTED[@]} == 0)); then
   info "nothing selected; no changes made"
   exit 0
 fi
+
+#  Obtain privileges once, AFTER the user has chosen, so a read-only browse of
+#  the picker never prompts for a password.
+need_root_or_die
 
 # -----------------------------------------------------------------------------
 #  Apply / revert
