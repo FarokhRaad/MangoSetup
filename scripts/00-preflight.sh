@@ -57,7 +57,11 @@ step "Filesystem / snapshots"
 #  snapper list-configs works unprivileged; listing snapshots needs sudo.
 #  Checking with plain `snapper -c root list` reports a false negative on
 #  permission denied, so check config existence instead.
-if command -v snapper >/dev/null 2>&1 && snapper list-configs 2>/dev/null | grep -qE '^\s*root\s'; then
+#  awk, not `grep -q`: under `set -o pipefail` a `grep -q` that matches early
+#  kills the producer with SIGPIPE and the pipeline reports 141, inverting the
+#  test. awk reads to EOF, so it is safe.
+if command -v snapper >/dev/null 2>&1 \
+   && snapper list-configs 2>/dev/null | awk '$1=="root"{found=1} END{exit !found}'; then
   ok "snapper configured for the root subvolume"
   fact HAS_SNAPPER 1
 else

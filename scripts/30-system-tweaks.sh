@@ -240,57 +240,69 @@ lid_revert() {
   return 0
 }
 
-#  --- dead DDC bus guard (slow/failing external monitor wake) --------------
-DDC_SRC="$SYS_DIR/bin/dp-dead-ddc-guard"
-DDC_RULE=/etc/udev/rules.d/89-dead-ddc-bus.rules
-#  Which connector to protect. Auto-detected: the first connector whose DDC is
-#  dead AND which is an external DisplayPort/HDMI output. eDP (laptop panel) is
-#  excluded because its DDC is always "dead" by design (it uses the native
-#  backlight interface), so blocking it would be pointless noise.
-ddc_dead_connector() {
-  command -v ddcutil >/dev/null 2>&1 || return 1
-  local bus="" conn=""
-  while IFS= read -r line; do
-    case "$line" in
-      *"/dev/i2c-"*) bus="${line##*/dev/i2c-}"; bus="${bus%%[^0-9]*}" ;;
-      *DRM?connector:*)
-        conn="${line##*:}"; conn="${conn//[[:space:]]/}"
-        [[ -n "$bus" ]] || continue
-        #  external only: DP-* or HDMI-*, never eDP-*
-        case "$conn" in
-          *eDP*) bus=""; continue ;;
-          *DP-*|*HDMI-*) ;;
-          *) bus=""; continue ;;
-        esac
-        if ! ddcutil --bus "$bus" getvcp 0x10 >/dev/null 2>&1; then
-          printf '%s\n' "${conn##*card?-}"
-          return 0
-        fi
-        bus=""
-        ;;
-    esac
-  done < <(ddcutil detect 2>/dev/null)
-  return 1
-}
+#  --- disable DDC/CI entirely (external monitor wake) ------------------------
+#  Supersedes an earlier per-bus udev approach. See
+#  system/modprobe/disable-i2c-dev-ddc.conf for the full reasoning; in short,
+#  blocking the i2c-dev module is the universal fix (no per-machine bus
+#  detection, immune to /dev/i2c-N renumbering, stops every DDC consumer at
+#  once) and the cost is software brightness on external monitors, which the
+#  monitors' physical buttons cover.
+DDC_SRC="$SYS_DIR/modprobe/disable-i2c-dev-ddc.conf"
+DDC_DST=/etc/modprobe.d/disable-i2c-dev-ddc.conf
+#  Masks for the modules-load.d entries that would otherwise make
+#  systemd-modules-load fail on every boot trying to load a blocked module.
+DDC_MASK_SRC="$SYS_DIR/modules-load"
+DDC_MASKS=(ddcutil.conf i2c-tools.conf)
+#  Only offer this where DDC could actually run: an i2c bus belonging to a
+#  display adapter must exist. On a machine with no such bus there is nothing
+#  to disable.
 ddc_applicable() {
   [[ -f "$DDC_SRC" ]] || return 1
-  command -v ddcutil >/dev/null 2>&1 || return 1
-  [[ -n "$(ddc_dead_connector)" ]]
+  compgen -G '/sys/bus/i2c/devices/i2c-*' >/dev/null 2>&1
 }
-ddc_applied() { [[ -f "$DDC_RULE" ]]; }
+ddc_applied() { [[ -f "$DDC_DST" ]]; }
 ddc_apply() {
-  local conn
-  conn=$(ddc_dead_connector) || { err "no external connector with dead DDC found"; return 1; }
-  info "blocking the dead DDC bus behind $conn"
-  if $DRY; then
-    info "[DRY] would run: $DDC_SRC install $conn"
-    return 0
+  run sudo install -m 644 -o root -g root "$DDC_SRC" "$DDC_DST" || return 1
+  #  Mask the package-shipped modules-load entries. Only mask a name the
+  #  system actually ships, so we do not litter /etc with pointless files.
+  local m
+  for m in "${DDC_MASKS[@]}"; do
+    [[ -f "/usr/lib/modules-load.d/$m" ]] || continue
+    [[ -f "$DDC_MASK_SRC/$m" ]] || continue
+    run sudo install -d -m 755 /etc/modules-load.d
+    run sudo install -m 644 -o root -g root "$DDC_MASK_SRC/$m" "/etc/modules-load.d/$m" \
+      && info "masked /usr/lib/modules-load.d/$m"
+  done
+  #  Unload now so the fix takes effect without a reboot. Best-effort: the
+  #  module is busy only if something holds a /dev/i2c-* fd right now.
+  #
+  #  NOT `lsmod | grep -q`: grep -q exits on the FIRST match, closing the pipe,
+  #  so lsmod dies with SIGPIPE (141) and `set -o pipefail` propagates 141 as
+  #  the pipeline status. The test then reads FALSE exactly when the module IS
+  #  loaded - inverted logic, and it silently skipped this whole block.
+  #  awk consumes all input and exits on its own, so there is no SIGPIPE.
+  if lsmod | awk '$1=="i2c_dev"{found=1} END{exit !found}'; then
+    if run sudo modprobe -r i2c_dev 2>/dev/null; then
+      ok "i2c-dev unloaded; DDC probing has stopped now"
+    else
+      warn "i2c-dev is in use and could not be unloaded; effective after reboot"
+    fi
   fi
-  bash "$DDC_SRC" install "$conn"
+  return 0
 }
 ddc_revert() {
-  if $DRY; then info "[DRY] would run: $DDC_SRC remove"; return 0; fi
-  bash "$DDC_SRC" remove
+  run sudo rm -f "$DDC_DST"
+  local m
+  for m in "${DDC_MASKS[@]}"; do
+    run sudo rm -f "/etc/modules-load.d/$m"
+  done
+  run sudo rmdir --ignore-fail-on-non-empty /etc/modules-load.d 2>/dev/null || true
+  if ! $DRY; then
+    sudo modprobe i2c_dev 2>/dev/null \
+      && ok "i2c-dev reloaded; DDC/CI is available again" \
+      || warn "could not reload i2c-dev now; it returns after a reboot"
+  fi
+  return 0
 }
 
 #  --- Logitech Bolt wake ----------------------------------------------------
@@ -402,7 +414,7 @@ mki_revert() { warn "not auto-reverted; restore from /etc/mkinitcpio.conf.bak-*"
 TWEAKS=(
   "writeback|CIFS/SMB writeback smoothing|wb|Caps dirty page cache to absolute bytes so copies to network shares stream steadily instead of burst-then-stall. Writes /etc/sysctl.d/. Safe with no shares: never limits fast local disks."
   "eee|Disable Realtek EEE (link flapping)|eee|Energy Efficient Ethernet on r8169-family NICs renegotiates the link, causing TCP retransmit storms that tank SMB throughput. Installs a NetworkManager dispatcher script (interface auto-detected, not hardcoded)."
-  "deadddc|Block dead DDC bus (monitor wake)|ddc|An external monitor whose DDC never answers makes every brightness probe burn ~2.5s on the DisplayPort AUX channel - the same channel used for link training - so the monitor wakes slowly or not at all. DMS probes all i2c buses every 30s and has no DDC off-switch, so the bus is blocked via udev instead. Measured 2627ms -> 11ms per probe. Costs software brightness on that monitor only (it never worked there anyway)."
+  "deadddc|Disable DDC/CI (fixes slow monitor wake)|ddc|An external monitor whose DDC never answers makes every brightness probe burn ~2.5s on the DisplayPort AUX channel - the same channel used for link training - so it wakes slowly or not at all. Blocks the i2c-dev module, which stops every DDC consumer at once (DMS probes all buses every 30s and has no off-switch). Monitor DETECTION and laptop backlight are unaffected. COSTS: software brightness on external monitors (use their buttons), and ddcutil/i2c-tools stop working."
   "lid|Ignore laptop lid switch|lid|Closing the lid no longer suspends, on battery or AC or docked, and the holdoff drops 30s -> 5s. Written as a logind.conf.d drop-in, NOT an edit to the package-owned logind.conf (which would generate a .pacnew on every systemd upgrade). The machine stays awake with the lid shut, so it can overheat in a bag. Applies at next boot."
   "logibolt|Logitech Bolt: no wake from suspend|logi|Stops the Bolt receiver (046d:c548) waking the machine on mouse movement. Writes /etc/udev/rules.d/."
   "hda|Keep HDA audio codec powered|hda|Prevents the Intel HDA codec autosuspending, which clicks/pops and clips the start of notification sounds. Writes /etc/modprobe.d/."

@@ -125,7 +125,9 @@ ok "dms-greeter found: $GREETER_PATH"
 #  Confirm THIS build actually accepts `mango` rather than trusting the docs.
 #  The wrapper prints its supported compositors in --help; if a future version
 #  drops mango, fail here instead of writing a greetd config that cannot start.
-if dms-greeter --help 2>&1 | grep -qw mango; then
+#  awk, not `grep -qw`: `grep -q` short-circuits and SIGPIPEs the producer,
+#  which `set -o pipefail` turns into a false negative.
+if dms-greeter --help 2>&1 | awk '/(^|[^[:alnum:]_])mango([^[:alnum:]_]|$)/{found=1} END{exit !found}'; then
   ok "dms-greeter supports --command mango"
 else
   err "this dms-greeter build does not list 'mango' as a supported compositor."
@@ -161,7 +163,7 @@ else
   run sudo useradd -M -G video -s /usr/bin/nologin greeter
   ok "'greeter' user created"
 fi
-if id -nG greeter 2>/dev/null | tr ' ' '\n' | grep -qx video; then
+if id -nG greeter 2>/dev/null | tr ' ' '\n' | awk '$0=="video"{found=1} END{exit !found}'; then
   ok "'greeter' is in the video group"
 else
   warn "'greeter' is NOT in the video group; the greeter may fail to start"

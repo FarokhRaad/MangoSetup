@@ -348,10 +348,13 @@ limine-mkinitcpio-hook   # optional
 #  and its dispatcher script exits quietly, so a missing ethtool would make
 #  the fix silently do nothing.
 ethtool
-#  ddcutil: needed by the "Block dead DDC bus" tweak to map i2c bus ->
-#  connector and test whether DDC actually answers. Also the tool you use to
-#  retest external-monitor brightness after enabling DDC/CI in a monitor's OSD.
-ddcutil
+#  ddcutil: NOT required by the setup. Listed as optional because it is the
+#  tool you would use to INVESTIGATE external-monitor DDC/CI (`ddcutil detect`,
+#  `ddcutil getvcp 0x10`). Note it conflicts in spirit with the "Disable DDC/CI"
+#  system tweak: that tweak blocks the i2c-dev module, after which ddcutil
+#  reports "No /dev/i2c devices exist". Install it only if you intend to keep
+#  DDC enabled and debug it.
+ddcutil  # optional
 pacman-contrib
 reflector
 rsync
