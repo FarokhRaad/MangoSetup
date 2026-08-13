@@ -1,0 +1,22 @@
+{
+  "name": "Gruvbox Dim",
+  "primary": "#A89984",
+  "primaryText": "#1D2021",
+  "primaryContainer": "#928374",
+  "secondary": "#B16286",
+  "surface": "#282828",
+  "surfaceText": "#EBDBB2",
+  "surfaceVariant": "#3C3836",
+  "surfaceVariantText": "#EBDBB2",
+  "surfaceContainer": "#282828",
+  "surfaceContainerHigh": "#504945",
+  "surfaceContainerHighest": "#665C54",
+  "background": "#1D2021",
+  "backgroundText": "#D5C4A1",
+  "outline": "#928374",
+  "error": "#FB4934",
+  "warning": "#FABD2F",
+  "info": "#83A598",
+  "success": "#B8BB26",
+  "matugen_type": "scheme-content"
+}

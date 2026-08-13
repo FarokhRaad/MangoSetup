@@ -1,0 +1,22 @@
+{
+  "name": "Everforest Dim",
+  "primary": "#859289",
+  "primaryText": "#1E2326",
+  "primaryContainer": "#7A8478",
+  "secondary": "#D699B6",
+  "surface": "#272E33",
+  "surfaceText": "#D3C6AA",
+  "surfaceVariant": "#414B50",
+  "surfaceVariantText": "#D3C6AA",
+  "surfaceContainer": "#272E33",
+  "surfaceContainerHigh": "#2E383C",
+  "surfaceContainerHighest": "#374145",
+  "background": "#1E2326",
+  "backgroundText": "#9DA9A0",
+  "outline": "#7A8478",
+  "error": "#E67E80",
+  "warning": "#DBBC7F",
+  "info": "#7FBBB3",
+  "success": "#A7C080",
+  "matugen_type": "scheme-content"
+}

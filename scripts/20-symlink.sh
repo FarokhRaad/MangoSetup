@@ -56,8 +56,16 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 [[ -d "$SRC_ROOT" ]] || { err "configs/ not found at $SRC_ROOT"; exit 1; }
 
 step "Discovering files under configs/"
-mapfile -t FILES < <(find "$SRC_ROOT" -type f | sort)
+#  Repo documentation is NOT configuration: a README explaining a directory to
+#  a reader of this repo has no business being symlinked into ~/.config, where
+#  it is just litter the application ignores. Excluded by name so a directory
+#  can be documented in-place without polluting the deployed tree.
+mapfile -t FILES < <(find "$SRC_ROOT" -type f \
+  ! -name 'README.md' ! -name 'README' ! -name '*.repo-notes.md' | sort)
 info "found ${#FILES[@]} file(s) to manage"
+excluded=$(find "$SRC_ROOT" -type f \
+  \( -name 'README.md' -o -name 'README' -o -name '*.repo-notes.md' \) | wc -l)
+(( excluded )) && info "skipping $excluded repo doc file(s) (not deployed)"
 
 LINKED=0; ALREADY=0; CONFLICTS=0; MISSING_TARGET_DIR=0
 
@@ -179,6 +187,17 @@ case "$MODE" in
   link)
     ok "linked/relinked : $LINKED"
     ok "already correct : $ALREADY"
+    #  Fonts are only visible to applications once fontconfig has indexed them.
+    #  Symlinking a .ttf into ~/.local/share/fonts does NOT trigger that, so a
+    #  freshly deployed font silently fails to resolve until something else
+    #  rebuilds the cache. Do it here, only when fonts were actually deployed.
+    if [[ -d "$HOME/.local/share/fonts" ]] && command -v fc-cache >/dev/null 2>&1; then
+      if fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1; then
+        ok "font cache rebuilt (fc-cache)"
+      else
+        warn "fc-cache failed; new fonts may not appear until you run: fc-cache -f"
+      fi
+    fi
     ((CONFLICTS)) && warn "existing files backed up: $CONFLICTS (see *.pre-mangosetup-* alongside each)" || true
     info "From now on, editing a file at either its ~/.config path or its"
     info "configs/ path in this repo edits the SAME file. Use 'git status'"

@@ -1,0 +1,22 @@
+{
+  "name": "Nord Dim",
+  "primary": "#81A1C1",
+  "primaryText": "#2E3440",
+  "primaryContainer": "#5E81AC",
+  "secondary": "#88C0D0",
+  "surface": "#2E3440",
+  "surfaceText": "#E5E9F0",
+  "surfaceVariant": "#3B4252",
+  "surfaceVariantText": "#E5E9F0",
+  "surfaceContainer": "#2E3440",
+  "surfaceContainerHigh": "#434C5E",
+  "surfaceContainerHighest": "#4C566A",
+  "background": "#242933",
+  "backgroundText": "#ECEFF4",
+  "outline": "#5E81AC",
+  "error": "#BF616A",
+  "warning": "#EBCB8B",
+  "info": "#81A1C1",
+  "success": "#A3BE8C",
+  "matugen_type": "scheme-content"
+}

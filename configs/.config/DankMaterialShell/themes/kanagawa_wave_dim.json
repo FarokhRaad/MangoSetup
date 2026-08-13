@@ -1,0 +1,22 @@
+{
+  "name": "Kanagawa Wave Dim",
+  "primary": "#7E9CA8",
+  "primaryText": "#161618",
+  "primaryContainer": "#556B75",
+  "secondary": "#C47D7D",
+  "surface": "#1B1C1E",
+  "surfaceText": "#DCD7BA",
+  "surfaceVariant": "#2A2B2D",
+  "surfaceVariantText": "#DCD7BA",
+  "surfaceContainer": "#1B1C1E",
+  "surfaceContainerHigh": "#2F3033",
+  "surfaceContainerHighest": "#3C3D41",
+  "background": "#141415",
+  "backgroundText": "#E2DEC5",
+  "outline": "#6A6F72",
+  "error": "#E46876",
+  "warning": "#DCA561",
+  "info": "#7E9CA8",
+  "success": "#8FBF7F",
+  "matugen_type": "scheme-fidelity"
+}

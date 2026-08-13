@@ -1,0 +1,22 @@
+{
+  "name": "Rose Pine Dim",
+  "primary": "#C4A7E7",
+  "primaryText": "#19191F",
+  "primaryContainer": "#9D7FC5",
+  "secondary": "#F4B8E4",
+  "surface": "#23232A",
+  "surfaceText": "#E0DEF4",
+  "surfaceVariant": "#2E2E35",
+  "surfaceVariantText": "#E0DEF4",
+  "surfaceContainer": "#23232A",
+  "surfaceContainerHigh": "#2F2F38",
+  "surfaceContainerHighest": "#3C3C45",
+  "background": "#1A1A20",
+  "backgroundText": "#ECEBF6",
+  "outline": "#908CAA",
+  "error": "#EB6F92",
+  "warning": "#F6C177",
+  "info": "#9CCFD8",
+  "success": "#A3BE8C",
+  "matugen_type": "scheme-fidelity"
+}

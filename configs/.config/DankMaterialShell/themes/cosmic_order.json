@@ -1,0 +1,28 @@
+{
+  "dark": {
+    "name": "Cosmic Order Dusk",
+    "primary": "#487a96",
+    "primaryText": "#1D1D22",
+    "primaryContainer": "#2F5D62",
+    "secondary": "#2f4858",
+    "surface": "#18212E",
+    "surfaceText": "#D9BFA0",
+    "surfaceVariant": "#2B2B2B",
+    "surfaceVariantText": "#D9BFA0",
+    "surfaceContainer": "#18212E",
+    "surfaceContainerHigh": "#2f3742",
+    "surfaceContainerHighest": "#273144 ",
+    "background": "#111821",
+    "backgroundText": "#E6E0D4",
+    "outline": "#2f423e",
+    "error": "#8B2C2C",
+    "warning": "#C48A3A",
+    "info": "#487a96",
+    "success": "#2F5D62",
+    "matugen_type": "scheme-content"
+  },
+  "light": {
+    "name": "Cosmic Order Dawn"
+
+  }
+}
