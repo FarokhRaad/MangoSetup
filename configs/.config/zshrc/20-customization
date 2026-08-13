@@ -9,8 +9,20 @@ POSH=agnoster
 # ZSH_THEME=robbyrussell
 
 # -----------------------------------------------------
-# oh-my-zsh plugins
+# oh-my-zsh
 # -----------------------------------------------------
+# Installed as the AUR package oh-my-zsh-git, which puts the tree in
+# /usr/share/oh-my-zsh (NOT ~/.oh-my-zsh, the path the upstream curl installer
+# uses). Because that location is root-owned, ZSH_CACHE_DIR must be redirected
+# somewhere writable or oh-my-zsh fails trying to write its completion cache.
+# Everything is guarded: with oh-my-zsh absent, the shell still starts and the
+# repo plugins sourced in 00-init are enough on their own.
+if [ -z "${ZSH:-}" ]; then
+  for _omz in /usr/share/oh-my-zsh "$HOME/.oh-my-zsh"; do
+    [ -r "$_omz/oh-my-zsh.sh" ] && { export ZSH="$_omz"; break; }
+  done
+  unset _omz
+fi
 plugins=(
     git
     sudo
@@ -21,13 +33,23 @@ plugins=(
     dirhistory
 )
 
-# Set-up oh-my-zsh
-source $ZSH/oh-my-zsh.sh
+# Set-up oh-my-zsh. Guarded: an unguarded `source $ZSH/oh-my-zsh.sh` expands to
+# `source /oh-my-zsh.sh` when ZSH is unset and errors on every shell start.
+if [ -n "${ZSH:-}" ] && [ -r "$ZSH/oh-my-zsh.sh" ]; then
+  # /usr/share/oh-my-zsh is root-owned, so point the cache at $HOME.
+  : "${ZSH_CACHE_DIR:=${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-zsh}"
+  export ZSH_CACHE_DIR
+  [ -d "$ZSH_CACHE_DIR/completions" ] || mkdir -p "$ZSH_CACHE_DIR/completions"
+  # 00-init already ran compinit; oh-my-zsh would run it a second time.
+  export ZSH_DISABLE_COMPFIX=true
+  source "$ZSH/oh-my-zsh.sh"
+fi
 
 # -----------------------------------------------------
 # Set-up FZF key bindings (CTRL R for fuzzy history finder)
 # -----------------------------------------------------
-source <(fzf --zsh)
+# Guarded: without fzf, `source <(fzf --zsh)` errors on every shell start.
+command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 
 # zsh history
 HISTFILE=~/.zsh_history
@@ -40,4 +62,5 @@ setopt appendhistory
 # -----------------------------------------------------
 # Prompt is starship, not oh-my-posh; see ~/.config/starship.toml.
 # eval "$(oh-my-posh init zsh --config $HOME/.config/ohmyposh/zen.toml)"
-eval "$(starship init zsh)"
+# Guarded so a missing starship does not break the prompt entirely.
+command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"

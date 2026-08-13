@@ -45,7 +45,7 @@
 #  Picking a shell here also offers to run `chsh`, since exporting SHELL does
 #  not change the login shell recorded in /etc/passwd.
 SHELL|bash|bash|repo|bash (already present on Arch)
-SHELL|zsh|zsh|repo|zsh (+ autosuggestions & syntax highlighting)|zsh-autosuggestions zsh-syntax-highlighting
+SHELL|zsh|zsh|aur|zsh (+ oh-my-zsh, autosuggestions, syntax highlighting)|zsh-autosuggestions zsh-syntax-highlighting oh-my-zsh-git
 SHELL|fish|fish|repo|fish (no repo config shipped - you configure it)
 
 # --- Terminal -----------------------------------------------------------------
