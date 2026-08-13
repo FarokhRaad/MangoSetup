@@ -216,7 +216,7 @@ reach is anything outside mango's own config, since only mango expands them:
 
 ## Compositor and shell versions this targets
 
-- **mango** 0.15.5+ (`github.com/mangowm/mango`, AUR package `mangowm`,
+- **mango** 0.16.0+ (`github.com/mangowm/mango`, AUR package `mangowm`,
   binary `mango`)
 - **DankMaterialShell** (`github.com/AvengeMedia/DankMaterialShell`, docs at
   <https://danklinux.com/docs/>) — a Quickshell (QML) + Go shell. This repo
@@ -227,9 +227,10 @@ reach is anything outside mango's own config, since only mango expands them:
 Hard dependencies worth knowing about:
 
 - `quickshell` — in `[extra]`, DMS's only hard UI dependency.
-- `dgop` — DMS's system-metrics backend. **Use `dgop-bin`, not `dgop-git`:**
-  the git PKGBUILD builds `./cmd/cli`, a path upstream renamed to
-  `cmd/dgop`, so `dgop-git` fails to build.
+- `dgop` — DMS's system-metrics backend, a hard dependency. It is now in the
+  official `[extra]` repo, so no AUR package is needed. (Historically the AUR
+  `dgop-git` failed to build: its PKGBUILD built `./cmd/cli`, a path upstream
+  renamed to `cmd/dgop`.)
 - `accountsservice` — hard dependency of `dms-shell`.
 
 Why DMS specifically: it has genuine first-class mango support, not a generic
