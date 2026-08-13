@@ -29,6 +29,18 @@
 #  default at any given time, per app.conf's own header.
 # =============================================================================
 
+# --- Shell ($SHELL) -----------------------------------------------------------
+#  bash is already installed on every Arch system (it is in `base`), so it is
+#  listed purely so the picker can show it and so choosing it is explicit.
+#  Selecting zsh ALSO pulls its companion packages (autosuggestions, syntax
+#  highlighting); those are deliberately absent from packages.txt so a
+#  bash-only machine does not carry them. See setup.sh's shell-companions step.
+#  The repo ships configs for both (.bashrc + .config/bashrc/, .zshrc +
+#  .config/zshrc/), so either choice lands in a configured shell.
+SHELL|bash|bash|repo|bash (already present on Arch)
+SHELL|zsh|zsh|repo|zsh (+ autosuggestions & syntax highlighting)
+SHELL|fish|fish|repo|fish (no repo config shipped - you configure it)
+
 # --- Terminal -----------------------------------------------------------------
 TERMINAL|konsole|konsole|repo|Konsole (KDE)
 TERMINAL|kitty|kitty|repo|kitty (GPU-accelerated)

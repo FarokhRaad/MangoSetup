@@ -269,6 +269,7 @@ ok "app catalog sane: no comma-in-label, every role maps to an apps.conf entry"
 mapfile -t CATEGORIES < <(cut -d'|' -f1 "$CATALOG" | grep -v '^#' | grep -v '^$' | awk '!seen[$0]++')
 
 declare -A CATEGORY_DEFAULT   # role -> chosen default binary, filled in below
+SKIPPED_INSTALLED=()          # apps left ticked that are already satisfied
 
 for role in "${CATEGORIES[@]}"; do
   mapfile -t ROWS < <(awk -F'|' -v r="$role" '$1==r {print}' "$CATALOG")
@@ -281,11 +282,23 @@ for role in "${CATEGORIES[@]}"; do
   PRESELECT=()
   for row in "${ROWS[@]}"; do
     IFS='|' read -r _ pkg bin _ label <<<"$row"
-    disp="$label  [$pkg]"
-    DISPLAY+=("$disp")
-    LABEL_TO_ROW["$disp"]="$row"
-    if command -v "$bin" &>/dev/null || pacman -Qi "$pkg" &>/dev/null; then
+    #  Provides-aware: `pacman -Qi` only matches an exact package name, so it
+    #  misses packages satisfied via provides (dgop-bin provides dgop) and
+    #  group names. `pacman -T` is the provides-aware test.
+    if command -v "$bin" &>/dev/null \
+       || pacman -Qi "$pkg" &>/dev/null \
+       || pacman -Qg "$pkg" &>/dev/null \
+       || pacman -T  "$pkg" &>/dev/null; then
+      #  Mark it, so you can see at a glance what is already there and would
+      #  NOT be reinstalled if left ticked.
+      disp="$label  [$pkg] (installed)"
+      DISPLAY+=("$disp")
+      LABEL_TO_ROW["$disp"]="$row"
       PRESELECT+=("$disp")
+    else
+      disp="$label  [$pkg]"
+      DISPLAY+=("$disp")
+      LABEL_TO_ROW["$disp"]="$row"
     fi
   done
 
@@ -313,7 +326,25 @@ for role in "${CATEGORIES[@]}"; do
   for disp in "${CHOSEN[@]}"; do
     row="${LABEL_TO_ROW[$disp]}"
     IFS='|' read -r _ pkg bin _ label <<<"$row"
-    echo "$pkg" >> "$SELECTIONS_FILE"
+    #  Only queue packages that are NOT already satisfied.
+    #
+    #  This is NOT what prevents reinstalls: every install call already passes
+    #  `--needed`, and that was verified to handle provides correctly and
+    #  without prompting (`pacman -S --needed --noconfirm ttf-font` skips via
+    #  noto-fonts and exits 0). The filter exists so the SUMMARY is honest -
+    #  counts and lists are computed before pacman runs, so without it the
+    #  wizard would claim to install things it then skips - and so an
+    #  already-satisfied AUR package never invokes the (much slower) helper.
+    if command -v "$bin" &>/dev/null \
+       || pacman -Qi "$pkg" &>/dev/null \
+       || pacman -Qg "$pkg" &>/dev/null \
+       || pacman -T  "$pkg" &>/dev/null; then
+      SKIPPED_INSTALLED+=("$label")
+    else
+      echo "$pkg" >> "$SELECTIONS_FILE"
+    fi
+    #  Still a valid default candidate either way: being already installed does
+    #  not disqualify an app from being the active default.
     CHOSEN_BINS+=("$bin|$label")
   done
 
@@ -335,7 +366,12 @@ for role in "${CATEGORIES[@]}"; do
   unset LABEL_TO_ROW
 done
 
-info "selections written to $SELECTIONS_FILE ($(wc -l < "$SELECTIONS_FILE") package(s))"
+queued=$(wc -l < "$SELECTIONS_FILE")
+if ((${#SKIPPED_INSTALLED[@]})); then
+  ok "already installed, not reinstalled: ${#SKIPPED_INSTALLED[@]} app(s)"
+  printf '      %s\n' "${SKIPPED_INSTALLED[@]}"
+fi
+info "queued for installation: $queued package(s) -> $SELECTIONS_FILE"
 
 # -----------------------------------------------------------------------------
 #  Write chosen defaults into apps.conf (only roles the picker touched;

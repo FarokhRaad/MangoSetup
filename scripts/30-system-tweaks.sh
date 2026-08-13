@@ -215,6 +215,84 @@ eee_revert() {
   done < <(eee_legacy_files)
 }
 
+#  --- logind lid switch ------------------------------------------------------
+LID_SRC="$SYS_DIR/logind/99-lid-ignore.conf"
+LID_DST=/etc/systemd/logind.conf.d/99-lid-ignore.conf
+#  Laptops only: on a desktop there is no lid, so the tweak is meaningless.
+#  hostnamectl is the reliable check; fall back to the ACPI lid button node.
+lid_applicable() {
+  [[ -f "$LID_SRC" ]] || return 1
+  [[ "$(hostnamectl chassis 2>/dev/null)" == laptop ]] && return 0
+  compgen -G '/proc/acpi/button/lid/*' >/dev/null 2>&1
+}
+lid_applied() { [[ -f "$LID_DST" ]]; }
+lid_apply() {
+  run sudo install -d -m 755 /etc/systemd/logind.conf.d || return 1
+  run sudo install -m 644 -o root -g root "$LID_SRC" "$LID_DST" || return 1
+  #  Deliberately NOT restarting systemd-logind: it kills the graphical
+  #  session with it. The drop-in is on disk and applies at next boot.
+  info "takes effect after a reboot (restarting logind would end your session)"
+  return 0
+}
+lid_revert() {
+  run sudo rm -f "$LID_DST"
+  run sudo rmdir --ignore-fail-on-non-empty /etc/systemd/logind.conf.d 2>/dev/null || true
+  return 0
+}
+
+#  --- dead DDC bus guard (slow/failing external monitor wake) --------------
+DDC_SRC="$SYS_DIR/bin/dp-dead-ddc-guard"
+DDC_RULE=/etc/udev/rules.d/89-dead-ddc-bus.rules
+#  Which connector to protect. Auto-detected: the first connector whose DDC is
+#  dead AND which is an external DisplayPort/HDMI output. eDP (laptop panel) is
+#  excluded because its DDC is always "dead" by design (it uses the native
+#  backlight interface), so blocking it would be pointless noise.
+ddc_dead_connector() {
+  command -v ddcutil >/dev/null 2>&1 || return 1
+  local bus="" conn=""
+  while IFS= read -r line; do
+    case "$line" in
+      *"/dev/i2c-"*) bus="${line##*/dev/i2c-}"; bus="${bus%%[^0-9]*}" ;;
+      *DRM?connector:*)
+        conn="${line##*:}"; conn="${conn//[[:space:]]/}"
+        [[ -n "$bus" ]] || continue
+        #  external only: DP-* or HDMI-*, never eDP-*
+        case "$conn" in
+          *eDP*) bus=""; continue ;;
+          *DP-*|*HDMI-*) ;;
+          *) bus=""; continue ;;
+        esac
+        if ! ddcutil --bus "$bus" getvcp 0x10 >/dev/null 2>&1; then
+          printf '%s\n' "${conn##*card?-}"
+          return 0
+        fi
+        bus=""
+        ;;
+    esac
+  done < <(ddcutil detect 2>/dev/null)
+  return 1
+}
+ddc_applicable() {
+  [[ -f "$DDC_SRC" ]] || return 1
+  command -v ddcutil >/dev/null 2>&1 || return 1
+  [[ -n "$(ddc_dead_connector)" ]]
+}
+ddc_applied() { [[ -f "$DDC_RULE" ]]; }
+ddc_apply() {
+  local conn
+  conn=$(ddc_dead_connector) || { err "no external connector with dead DDC found"; return 1; }
+  info "blocking the dead DDC bus behind $conn"
+  if $DRY; then
+    info "[DRY] would run: $DDC_SRC install $conn"
+    return 0
+  fi
+  bash "$DDC_SRC" install "$conn"
+}
+ddc_revert() {
+  if $DRY; then info "[DRY] would run: $DDC_SRC remove"; return 0; fi
+  bash "$DDC_SRC" remove
+}
+
 #  --- Logitech Bolt wake ----------------------------------------------------
 LOGI_SRC="$SYS_DIR/udev/90-disable-logi-bolt-wake.rules"
 LOGI_DST="/etc/udev/rules.d/90-disable-logi-bolt-wake.rules"
@@ -324,6 +402,8 @@ mki_revert() { warn "not auto-reverted; restore from /etc/mkinitcpio.conf.bak-*"
 TWEAKS=(
   "writeback|CIFS/SMB writeback smoothing|wb|Caps dirty page cache to absolute bytes so copies to network shares stream steadily instead of burst-then-stall. Writes /etc/sysctl.d/. Safe with no shares: never limits fast local disks."
   "eee|Disable Realtek EEE (link flapping)|eee|Energy Efficient Ethernet on r8169-family NICs renegotiates the link, causing TCP retransmit storms that tank SMB throughput. Installs a NetworkManager dispatcher script (interface auto-detected, not hardcoded)."
+  "deadddc|Block dead DDC bus (monitor wake)|ddc|An external monitor whose DDC never answers makes every brightness probe burn ~2.5s on the DisplayPort AUX channel - the same channel used for link training - so the monitor wakes slowly or not at all. DMS probes all i2c buses every 30s and has no DDC off-switch, so the bus is blocked via udev instead. Measured 2627ms -> 11ms per probe. Costs software brightness on that monitor only (it never worked there anyway)."
+  "lid|Ignore laptop lid switch|lid|Closing the lid no longer suspends, on battery or AC or docked, and the holdoff drops 30s -> 5s. Written as a logind.conf.d drop-in, NOT an edit to the package-owned logind.conf (which would generate a .pacnew on every systemd upgrade). The machine stays awake with the lid shut, so it can overheat in a bag. Applies at next boot."
   "logibolt|Logitech Bolt: no wake from suspend|logi|Stops the Bolt receiver (046d:c548) waking the machine on mouse movement. Writes /etc/udev/rules.d/."
   "hda|Keep HDA audio codec powered|hda|Prevents the Intel HDA codec autosuspending, which clicks/pops and clips the start of notification sounds. Writes /etc/modprobe.d/."
   "pacman|pacman.conf niceties|pac|Color, VerbosePkgLists, ParallelDownloads=10. Backs up pacman.conf first."

@@ -113,12 +113,19 @@ if ! command -v "$BIN" &>/dev/null; then
     warn "(non-interactive: not installing; set the app up yourself)"
   fi
   if [[ "$reply" == "y" || "$reply" == "Y" ]]; then
+    #  --needed on both paths: never reinstall something already present.
+    #  Accept paru as well as yay; 10-packages.sh detects either, so hardcoding
+    #  yay here would fail on a paru-only machine.
+    aur_helper=""
+    for h in yay paru; do
+      command -v "$h" &>/dev/null && { aur_helper="$h"; break; }
+    done
     if pacman -Si "$BIN" &>/dev/null; then
       sudo pacman -S --needed "$BIN"
-    elif command -v yay &>/dev/null; then
-      yay -S --needed "$BIN"
+    elif [[ -n "$aur_helper" ]]; then
+      "$aur_helper" -S --needed "$BIN"
     else
-      err "could not find '$BIN' in the repos or resolve it via yay"
+      err "'$BIN' is not in the repos and no AUR helper (yay/paru) is installed"
       exit 1
     fi
   else

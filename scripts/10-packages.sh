@@ -197,16 +197,37 @@ info "combined manifest: ${#ALL_PKGS[@]} unique package(s)"
 # -----------------------------------------------------------------------------
 #  Partition into: already installed / needs pacman / needs AUR
 # -----------------------------------------------------------------------------
+#  Is a package already satisfied on this system?
+#
+#  NOTE: reinstalls are ALREADY prevented by `--needed` on every install call
+#  (pacman and the AUR helper alike). Verified: `pacman -S --needed --noconfirm
+#  ttf-font` resolves the provides to noto-fonts, skips, and exits 0 with no
+#  prompt. This function is about REPORTING accurately - the "will install N
+#  packages" summary is computed before pacman runs - and about not invoking
+#  the slow AUR helper for packages that are already present.
+#
+#  `pacman -Qi <name>` only matches the EXACT installed package name, so it
+#  misses two cases and would overstate the work:
+#    1. PROVIDES  - e.g. dgop-bin provides dgop; ttf-font is provided by many
+#                   fonts. -Qi says "not installed", -T says satisfied.
+#    2. GROUPS    - group members are installed but the group name is not a
+#                   package, so -Qi fails.
+#  `pacman -T` (deptest) is the provides-aware test: it prints nothing and
+#  exits 0 when the dependency is satisfied.
+pkg_satisfied() {
+  local p="$1"
+  pacman -Qi "$p" &>/dev/null && return 0
+  pacman -Qg "$p" &>/dev/null && return 0
+  pacman -T  "$p" &>/dev/null && return 0
+  return 1
+}
+
 step "Checking installed state"
 ALREADY=(); NEED_PACMAN=(); NEED_AUR=(); UNKNOWN=()
 for pkg in "${ALL_PKGS[@]}"; do
   pkg="${pkg%%#*}"; pkg="${pkg// /}"
   [[ -z "$pkg" ]] && continue
-  if pacman -Qi "$pkg" &>/dev/null; then
-    ALREADY+=("$pkg")
-  elif pacman -Qg "$pkg" &>/dev/null; then
-    #  Package GROUPS (historically base-devel) are not reported by -Qi. If the
-    #  group resolves locally, its members are installed.
+  if pkg_satisfied "$pkg"; then
     ALREADY+=("$pkg")
   elif pacman -Si "$pkg" &>/dev/null || pacman -Sg "$pkg" &>/dev/null; then
     NEED_PACMAN+=("$pkg")

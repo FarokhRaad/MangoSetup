@@ -248,15 +248,24 @@ kde-cli-tools
 archlinux-xdg-menu
 
 # -----------------------------------------------------------------------------
-#  Terminal and shell
+#  Shell and CLI tooling
 # -----------------------------------------------------------------------------
-#  Baseline terminal package. TERMINAL's active default and any additional
-#  terminals are managed by conf/apps.conf and the setup.sh app picker; see
-#  that file's header and scripts/swap-app.sh to change it.
-konsole
-zsh
-zsh-autosuggestions
-zsh-syntax-highlighting
+#  NO TERMINAL EMULATOR IS LISTED HERE. Terminals are a personal choice and are
+#  offered per-role by the setup.sh picker (packages/app-catalog.txt: konsole,
+#  kitty, alacritty, foot, wezterm). conf/apps.conf's env=TERMINAL sets which
+#  one the keybindings launch; scripts/swap-app.sh changes it later.
+#  NOTE: rules-windows.conf has an appid-matched rule for Konsole's window
+#  swallowing. That rule is inert if Konsole is not installed, and apps.conf's
+#  header explains how to add an equivalent for a different terminal.
+#
+#  SHELLS are also picker-driven (role SHELL). zsh's companion packages are
+#  intentionally NOT listed here, because installing zsh-autosuggestions and
+#  zsh-syntax-highlighting on a bash-only system is dead weight; the picker
+#  pulls them in only when zsh is selected (see app-catalog.txt's SHELL rows
+#  and the "shell companions" logic in setup.sh).
+#
+#  Prompt: starship is shell-agnostic (bash AND zsh) and is configured by the
+#  checked-in configs/.config/starship.toml, so it stays a base package.
 starship
 fzf
 zoxide
@@ -264,31 +273,30 @@ eza
 bat
 ripgrep
 fd
-yazi
 jq
 gum
 figlet
 neovim
+bash-completion
 
 # -----------------------------------------------------------------------------
 #  Fonts
 # -----------------------------------------------------------------------------
+#  Nerd Fonts supply the glyphs the shell prompt and the bar use.
 ttf-jetbrains-mono-nerd
 ttf-firacode-nerd
 ttf-dejavu-nerd
 noto-fonts
 #  noto-fonts-emoji supplies NotoColorEmoji.ttf (CBDT/CBLC color bitmaps).
 #  Installing it is NOT sufficient by itself: other fonts that also claim
-#  emoji code points (e.g. otf-font-awesome, or any Segoe UI Symbol/Emoji
-#  files dropped into ~/.fonts) can outrank it in fontconfig's
+#  emoji code points (any Segoe UI Symbol/Emoji files dropped into ~/.fonts,
+#  or an icon font that maps emoji ranges) can outrank it in fontconfig's
 #  coverage-sorted fallback, rendering emoji monochrome instead of color.
 #  configs/.config/fontconfig/conf.d/76-noto-color-emoji.conf strips the
 #  emoji ranges from known offenders at scan time so Noto wins regardless
 #  of what else is installed. See that file.
 noto-fonts-emoji
 noto-fonts-cjk
-otf-font-awesome
-ttf-ms-fonts  # optional
 
 #  Applications for file manager, image viewer, document viewer, archive
 #  manager, and media player roles are NOT listed here. They are installed
@@ -299,6 +307,40 @@ ttf-ms-fonts  # optional
 #  yourself (see apps.conf's header and scripts/swap-app.sh).
 
 # -----------------------------------------------------------------------------
+#  Filesystems, snapshots and storage
+# -----------------------------------------------------------------------------
+#  Normal-system-operation packages. These are NOT desktop niceties: without
+#  them a Btrfs root has no snapshot tooling, NTFS/SMB volumes will not mount,
+#  and AppImages fail to run.
+#
+#  Btrfs + snapshots. Harmless on a non-Btrfs root (the tools simply have
+#  nothing to act on), which is why they are unconditional rather than
+#  gated on a filesystem probe.
+btrfs-progs
+snapper
+#  snap-pac takes an automatic pre/post snapshot around every pacman
+#  transaction, so a bad upgrade is one rollback away.
+snap-pac
+#  GUI for browsing/restoring snapshots and managing subvolumes.
+btrfs-assistant
+#  Filesystem drivers: NTFS (external/Windows disks), SMB/CIFS (network
+#  shares), and FUSE 2 (still required by AppImages and older FUSE tools).
+ntfs-3g
+cifs-utils
+fuse2
+#  exFAT support for cameras/SD cards (mkfs + fsck; the kernel driver is
+#  built in).
+exfatprogs
+
+#  Limine bootloader snapshot integration. Only useful with Limine, but both
+#  are AUR packages that no-op elsewhere:
+#    limine-snapper-sync      makes snapper snapshots appear as boot entries
+#    limine-mkinitcpio-hook   regenerates the Limine entries on kernel updates
+#  Marked optional so a systemd-boot/GRUB machine does not build them.
+limine-snapper-sync      # optional
+limine-mkinitcpio-hook   # optional
+
+# -----------------------------------------------------------------------------
 #  System utilities
 # -----------------------------------------------------------------------------
 #  ethtool: required by the optional "Disable Realtek EEE" system tweak
@@ -306,18 +348,20 @@ ttf-ms-fonts  # optional
 #  and its dispatcher script exits quietly, so a missing ethtool would make
 #  the fix silently do nothing.
 ethtool
+#  ddcutil: needed by the "Block dead DDC bus" tweak to map i2c bus ->
+#  connector and test whether DDC actually answers. Also the tool you use to
+#  retest external-monitor brightness after enabling DDC/CI in a monitor's OSD.
+ddcutil
 pacman-contrib
 reflector
 rsync
+wget
 unzip
 unrar
 #  p7zip was renamed to '7zip' in the Arch repos.
 7zip
 man-pages
-bash-completion
 fastfetch
 btop
 solaar
-ntfs-3g
-cifs-utils
-fuse2
+
