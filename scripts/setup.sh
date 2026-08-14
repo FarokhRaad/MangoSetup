@@ -331,6 +331,17 @@ for role in "${CATEGORIES[@]}"; do
   #  apps.conf still only launches ONE app per role at a time.
   CHOSEN_BINS=()
   for disp in "${CHOSEN[@]}"; do
+    #  gum choose's stdout can carry a trailing blank line (terminal/build
+    #  dependent), and `mapfile` turns that into an empty "" element in
+    #  CHOSEN. Looking that up in an associative array under `set -u` is a
+    #  hard error two ways in a row: `bad array subscript` for the empty
+    #  key, then `unbound variable` for the resulting non-lookup. Skip it
+    #  rather than let the whole picker crash over whitespace gum emitted.
+    [[ -n "$disp" ]] || continue
+    if [[ -z "${LABEL_TO_ROW[$disp]+set}" ]]; then
+      warn "picker returned an unrecognised entry, skipping: [$disp]"
+      continue
+    fi
     row="${LABEL_TO_ROW[$disp]}"
     #  6th field = optional space-separated companion packages, installed only
     #  when this row is selected. Must be read explicitly: `read` assigns the
