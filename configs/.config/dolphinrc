@@ -1,25 +1,8 @@
-# Dolphin settings
-# =============================================================================
-#  Deployed to ~/.config/dolphinrc by scripts/20-symlink.sh.
-#
-#  Only the settings that matter for this setup are kept. Dolphin rewrites this
-#  file when you change things in its own UI, and because the deployed path is a
-#  SYMLINK back into this repo, your changes show up as a git diff. That is
-#  intentional: `git diff` in the repo shows what you changed while using it.
-#
-#  Note the ViewPropsTimestamp / Version keys Dolphin writes itself are omitted
-#  here; they are state, not configuration, and Dolphin regenerates them.
-
 [General]
-#  Panels stay unlocked so the Places/Terminal panels can be rearranged.
 LockPanels=false
-#  Start with a clean window rather than restoring last session's tabs.
 RememberOpenedTabs=false
-
-[MainWindow]
-#  Hidden menu bar; the hamburger toolbar button replaces it. Removes a row of
-#  chrome, which matters more on a tiling compositor where windows are dense.
-MenuBar=Disabled
+Version=202
+ViewPropsTimestamp=2026,8,14,13,1,21.701999999999998
 
 [IconsMode]
 PreviewSize=128
@@ -28,17 +11,8 @@ PreviewSize=128
 Places Icons Auto-resize=false
 Places Icons Static Size=22
 
+[MainWindow]
+MenuBar=Disabled
+
 [PreviewSettings]
-#  Thumbnail generators to enable, by plugin name.
-#
-#  WHERE THESE COME FROM (verified with `pacman -F` against
-#  /usr/lib/qt6/plugins/kf6/thumbcreator/):
-#    * 15 of the 16 below ship in kio-extras, which arrives automatically as a
-#      dolphin dependency, so they need no manifest entry.
-#    * ffmpegthumbs (video thumbnails) is a SEPARATE package and is NOT pulled
-#      in by dolphin. It is listed explicitly in packages/packages.txt.
-#      Without it, naming it here is harmless but videos show a generic icon.
-#
-#  A name listed here that has no installed plugin is ignored, so this list is
-#  safe on a machine where some optional thumbnailers are absent.
 Plugins=appimagethumbnail,audiothumbnail,comicbookthumbnail,cursorthumbnail,djvuthumbnail,ebookthumbnail,exrthumbnail,directorythumbnail,imagethumbnail,jpegthumbnail,kraorathumbnail,windowsexethumbnail,windowsimagethumbnail,opendocumentthumbnail,svgthumbnail,ffmpegthumbs
